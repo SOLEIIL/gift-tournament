@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { AddGiftsModal } from './AddGiftsModal';
 import { QuickDeposit } from './QuickDeposit';
-import { TelegramUserInfo } from './TelegramUserInfo';
 import { Player, NFT } from '../types';
 import { TelegramUser } from '../types/telegram';
 import { mockNFTs } from '../utils/mockData';
@@ -320,9 +319,6 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   return (
     <div className="min-h-screen bg-background p-3">
-      {/* Telegram User Info */}
-      <TelegramUserInfo user={user || null} isTelegram={isTelegram} />
-      
       {/* Test Panel Toggle Only */}
        <div className="bg-card border border-border rounded-lg p-3 mb-3">
          <div className="flex items-center justify-end">
