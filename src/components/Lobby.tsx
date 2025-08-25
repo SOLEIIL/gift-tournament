@@ -12,6 +12,18 @@ interface LobbyProps {
   pot: number;
   onAddNFT: (playerId: string, nft: NFT) => void;
   updateGameStats: (winner: Player, gameNumber: number) => void;
+  lastGameStats: {
+    winner: Player | null;
+    winnerGain: number;
+    winnerChance: number;
+    gameNumber: number;
+  } | null;
+  topGameStats: {
+    winner: Player | null;
+    winnerGain: number;
+    winnerChance: number;
+    gameNumber: number;
+  } | null;
   onPageChange: (page: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn') => void;
   currentPage: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn';
 }
@@ -21,6 +33,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   pot,
   onAddNFT,
   updateGameStats,
+  lastGameStats,
+  topGameStats,
   onPageChange,
   currentPage,
 }) => {
@@ -299,9 +313,9 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-background p-2">
+    <div className="min-h-screen bg-background p-3">
       {/* Test Panel Button - Fixed Position */}
-      <div className="fixed bottom-4 right-4 z-50">
+      <div className="fixed top-4 right-4 z-50">
         <Button
           variant="outline"
           size="sm"
@@ -312,17 +326,98 @@ export const Lobby: React.FC<LobbyProps> = ({
         </Button>
       </div>
 
-      {/* Simple Game Stats */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-center">
-          <span className="text-lg font-semibold text-white">
-            {players.reduce((total, player) => total + player.nfts.length, 0)} GIFTS
-          </span>
-        </div>
-        <div className="text-center">
-          <span className="text-lg font-semibold text-white">
-            {pot.toFixed(2)} TON
-          </span>
+                  {/* Last Game & Top Game Cards */}
+            <div className="flex gap-2 mb-2">
+              {/* Last Game Card */}
+              <div className="flex-1 bg-card border border-border rounded-lg p-2">
+                <div className="flex items-center justify-between min-h-[40px]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-xs">
+                        {lastGameStats?.winner?.shortName?.charAt(0) || 'P'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col min-w-0 gap-0.5">
+                      <p className="font-medium text-white text-xs truncate">
+                        {lastGameStats?.winner ? `@${lastGameStats.winner.shortName}...` : '@pavlo...'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">LAST GAME</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end justify-center ml-2 gap-0.5">
+                    <p className="text-sm font-semibold text-blue-300 leading-tight">
+                      {lastGameStats ? `+${lastGameStats.winnerGain} TON` : '+99 TON'}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-tight">
+                      {lastGameStats ? `CHANCE ${Math.round(lastGameStats.winnerChance)}%` : 'CHANCE 81%'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Game Card */}
+              <div className="flex-1 bg-card border border-border rounded-lg p-2">
+                <div className="flex items-center justify-between min-h-[40px]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-xs">
+                        {topGameStats?.winner?.shortName?.charAt(0) || 'G'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col min-w-0 gap-0.5">
+                      <p className="font-medium text-white text-xs truncate">
+                        {topGameStats?.winner ? `@${topGameStats.winner.shortName}...` : '@Ga...'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">TOP GAME</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end justify-center ml-2 gap-0.5">
+                    <p className="text-sm font-semibold text-yellow-400 leading-tight">
+                      {topGameStats ? `+${topGameStats.winnerGain} TON` : '+36188 TON'}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-tight">
+                      {topGameStats ? `CHANCE ${Math.round(topGameStats.winnerChance)}%` : 'CHANCE 48%'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+      {/* Game Status Bar */}
+      <div className="bg-card border border-border rounded-lg p-2 mb-3">
+        <div className="flex items-center justify-between">
+          {/* History Button */}
+          <div 
+            className="p-2 bg-muted/20 rounded-lg cursor-pointer hover:bg-muted/30 transition-colors"
+            onClick={() => setShowHistory(true)}
+          >
+            <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" transform="rotate(180 12 12)" />
+            </svg>
+          </div>
+          
+          {/* Game Stats */}
+          <div className="flex items-center gap-3">
+            <div className="text-center">
+              <span className="text-base font-semibold text-white">
+                {players.reduce((total, player) => total + player.nfts.length, 0)} GIFTS
+              </span>
+            </div>
+            <div className="w-px h-5 bg-muted-foreground/30"></div>
+            <div className="text-center">
+              <span className="text-base font-semibold text-white">
+                {pot.toFixed(2)} TON
+              </span>
+            </div>
+          </div>
+          
+          {/* Chat Button */}
+          <div className="p-2 bg-muted/20 rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
+            <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -334,7 +429,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="relative w-full max-w-4xl mx-auto">
                          {/* Arena Circle */}
                           <div className={`
-                w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 xl:w-[24rem] xl:h-[24rem] mx-auto border-2 border-dashed border-muted-foreground/30 rounded-full 
+                w-80 h-80 sm:w-96 sm:h-96 lg:w-[28rem] lg:h-[28rem] xl:w-[32rem] xl:h-[32rem] mx-auto border-2 border-dashed border-muted-foreground/30 rounded-full 
                 flex items-center justify-center transition-all duration-1000
                 ${tournamentPhase === 'running' ? 'animate-pulse border-red-400' : ''}
                 ${tournamentPhase === 'finished' ? 'border-green-400 scale-90' : ''}
@@ -723,12 +818,12 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* Players - Only show when players have deposited gifts */}
       {players.filter(p => p.nfts.length > 0).length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-3 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base font-semibold">Players</h3>
-            <span className="text-xs text-muted-foreground">Game #{gameNumber}</span>
+        <div className="bg-card border border-border rounded-lg p-4 mb-6 pb-16" style={{ borderBottomWidth: '2px' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Players</h3>
+            <span className="text-sm text-muted-foreground">Game #{gameNumber}</span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {players
               .filter(p => p.nfts.length > 0)
               .sort((a, b) => {
@@ -739,23 +834,23 @@ export const Lobby: React.FC<LobbyProps> = ({
                 return b.totalValue - a.totalValue;
               })
               .map((player) => (
-                <div key={player.id} className="flex items-center justify-between p-2 bg-muted/20 rounded-lg cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedPlayer(player)}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-ton/20 rounded-full flex items-center justify-center">
-                      <span className="font-bold text-ton text-sm">{player.shortName}</span>
+                <div key={player.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setSelectedPlayer(player)}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-ton/20 rounded-full flex items-center justify-center">
+                      <span className="font-bold text-ton">{player.shortName}</span>
                     </div>
                     <div>
-                      <p className="font-medium text-sm">
+                      <p className="font-medium">
                         {player.id === currentPlayer.id ? 'You' : player.name}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {player.nfts.length} gift{player.nfts.length !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-ton text-sm">{player.totalValue} TON</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-semibold text-ton">{player.totalValue} TON</p>
+                    <p className="text-sm text-muted-foreground">
                       {player.winChance.toFixed(1)}% chance
                     </p>
                   </div>

@@ -10,11 +10,13 @@ import { Inventory } from './components/Inventory';
 function App() {
   const [currentPage, setCurrentPage] = useState<'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn'>('pvp');
   
-    const {
-    state,
+  const { 
+    state, 
     addNFTToPlayer, 
     resetGame, 
-    updateGameStats
+    updateGameStats, 
+    lastGameStats, 
+    topGameStats 
   } = useTournamentState();
 
   const {
@@ -66,6 +68,8 @@ function App() {
             pot={state.pot}
             onAddNFT={addNFTToPlayer}
             updateGameStats={updateGameStats}
+            lastGameStats={lastGameStats}
+            topGameStats={topGameStats}
             onPageChange={setCurrentPage}
             currentPage={currentPage}
           />
