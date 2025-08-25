@@ -320,7 +320,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           variant="outline"
           size="sm"
           onClick={() => setShowTestPanel(!showTestPanel)}
-          className="text-xs bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card"
+          className="text-xs bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card shadow-lg"
         >
           {showTestPanel ? '🔒 Hide' : '🧪 Test'}
         </Button>
