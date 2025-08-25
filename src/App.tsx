@@ -20,7 +20,6 @@ function App() {
   } = useTournamentState();
 
   const {
-    user,
     themeParams,
     isTelegram,
     isReady,
