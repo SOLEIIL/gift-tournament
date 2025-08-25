@@ -13,7 +13,7 @@ const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
   depositAccountUsername: 'WxyzCrypto',
   depositAccountPhone: '+1234567890', // À remplacer par votre vrai numéro
   webhookUrl: 'https://gift-tournament-git-main-soleiils-projects.vercel.app/api/deposit-webhook',
-  apiKey: process.env.REACT_APP_DEPOSIT_API_KEY || 'wxyz-crypto-secure-key-2024',
+  apiKey: 'wxyz-crypto-secure-key-2024',
   minTransferValue: 1,
   maxTransferValue: 10000,
   autoConfirm: true,
@@ -42,7 +42,7 @@ export const useDeposit = () => {
       
       // Charger les données initiales
       if (user?.id) {
-        await loadUserInventory(user.id);
+        await loadUserInventory(user.id.toString());
         await loadDepositAccountStats();
       }
       
@@ -89,7 +89,7 @@ export const useDeposit = () => {
       
       // Recharger l'inventaire si l'utilisateur est concerné
       if (user?.id && webhookData.data?.fromUserId === user.id) {
-        await loadUserInventory(user.id);
+        await loadUserInventory(user.id.toString());
       }
     } catch (err) {
       console.error('❌ Erreur lors du traitement du webhook:', err);
@@ -101,7 +101,7 @@ export const useDeposit = () => {
     if (!depositService || !user?.id) return;
 
     try {
-      const history = await depositService.getUserTransferHistory(user.id);
+      const history = await depositService.getUserTransferHistory(user.id.toString());
       const pending = history.filter(transfer => transfer.status === 'pending');
       setPendingTransfers(pending);
     } catch (err) {
@@ -114,7 +114,7 @@ export const useDeposit = () => {
     if (!user?.id) return;
 
     await Promise.all([
-      loadUserInventory(user.id),
+      loadUserInventory(user.id.toString()),
       loadDepositAccountStats(),
       checkPendingTransfers()
     ]);

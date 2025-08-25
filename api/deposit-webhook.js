@@ -1,5 +1,5 @@
 // api/deposit-webhook.js
-import crypto from 'crypto';
+const crypto = require('crypto');
 
 // Configuration sécurisée
 const DEPOSIT_CONFIG = {
@@ -125,7 +125,7 @@ const handleTransferFailed = async (transfer) => {
 };
 
 // Endpoint principal du webhook
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Seulement accepter les requêtes POST
   if (req.method !== 'POST') {
     return res.status(405).json({ 

@@ -6,10 +6,13 @@ export interface DepositTransfer {
   giftId: string;
   giftName: string;
   giftValue: number;
+  giftType: 'sticker' | 'gif' | 'document' | 'emoji' | 'text' | 'unknown';
+  mediaType: string;
   timestamp: Date;
   status: 'pending' | 'confirmed' | 'failed' | 'processed';
   transactionHash?: string;
   telegramMessageId?: string;
+  messageText?: string;
 }
 
 export interface DepositAccount {

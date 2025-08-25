@@ -13,18 +13,12 @@ export const DepositInstructions: React.FC<DepositInstructionsProps> = ({
   onClose
 }) => {
   const [copiedUsername, setCopiedUsername] = useState(false);
-  const [copiedPhone, setCopiedPhone] = useState(false);
 
-  const copyToClipboard = async (text: string, type: 'username' | 'phone') => {
+  const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      if (type === 'username') {
-        setCopiedUsername(true);
-        setTimeout(() => setCopiedUsername(false), 2000);
-      } else {
-        setCopiedPhone(true);
-        setTimeout(() => setCopiedPhone(false), 2000);
-      }
+      setCopiedUsername(true);
+      setTimeout(() => setCopiedUsername(false), 2000);
     } catch (error) {
       console.error('Erreur lors de la copie:', error);
     }
@@ -93,7 +87,7 @@ export const DepositInstructions: React.FC<DepositInstructionsProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(`@${config.depositAccountUsername}`, 'username')}
+                      onClick={() => copyToClipboard(`@${config.depositAccountUsername}`)}
                       className="h-6 w-6 p-0"
                     >
                       {copiedUsername ? (
@@ -117,20 +111,28 @@ export const DepositInstructions: React.FC<DepositInstructionsProps> = ({
             </div>
           </div>
 
-          {/* Étape 3 */}
-          <div className="bg-muted/20 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-white text-xs font-bold">3</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-white mb-2">Envoyer votre gift</h3>
-                <p className="text-sm text-muted-foreground">
-                  Envoyez le gift que vous souhaitez déposer au compte de dépôt
-                </p>
-              </div>
-            </div>
-          </div>
+                     {/* Étape 3 */}
+           <div className="bg-muted/20 rounded-lg p-4">
+             <div className="flex items-start gap-3">
+               <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                 <span className="text-white text-xs font-bold">3</span>
+               </div>
+               <div className="flex-1">
+                 <h3 className="font-medium text-white mb-2">Envoyer votre gift Telegram</h3>
+                 <div className="space-y-2">
+                   <p className="text-sm text-muted-foreground">
+                     Envoyez un gift au compte de dépôt :
+                   </p>
+                   <ul className="text-xs text-muted-foreground space-y-1 ml-2">
+                     <li>• 🎁 Stickers ou emojis</li>
+                     <li>• 💎 GIFs animés</li>
+                     <li>• 🌟 Messages avec "5 TON" ou "gift 10"</li>
+                     <li>• ✨ Documents ou médias</li>
+                   </ul>
+                 </div>
+               </div>
+             </div>
+           </div>
 
           {/* Étape 4 */}
           <div className="bg-muted/20 rounded-lg p-4">

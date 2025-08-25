@@ -185,6 +185,7 @@ class DepositService {
   // Obtenir l'inventaire d'un utilisateur
   async getUserInventory(userId: string): Promise<UserInventory | null> {
     // Simulation - à remplacer par l'API de base de données
+    console.log(`Récupération de l'inventaire pour l'utilisateur: ${userId}`);
     return {
       userId,
       username: '@user',
@@ -197,6 +198,7 @@ class DepositService {
   // Obtenir l'historique des transferts d'un utilisateur
   async getUserTransferHistory(userId: string): Promise<DepositTransfer[]> {
     // Simulation - à remplacer par l'API de base de données
+    console.log(`Récupération de l'historique pour l'utilisateur: ${userId}`);
     return [];
   }
 

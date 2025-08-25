@@ -132,7 +132,11 @@ Vos utilisateurs verront ces instructions :
 
 1. **Ouvrir Telegram**
 2. **Contacter @WxyzCrypto**
-3. **Envoyer le gift** (fichier .gift, .ton, .crypto, .nft)
+3. **Envoyer un gift Telegram** :
+   - 🎁 Stickers ou emojis
+   - 💎 GIFs animés  
+   - 🌟 Messages avec "5 TON" ou "gift 10"
+   - ✨ Documents ou médias
 4. **Attendre la confirmation** (30 secondes)
 
 ### **Notifications Automatiques**
