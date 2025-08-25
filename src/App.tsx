@@ -73,8 +73,6 @@ function App() {
             topGameStats={topGameStats}
             onPageChange={setCurrentPage}
             currentPage={currentPage}
-            user={user}
-            isTelegram={isTelegram}
           />
         );
       

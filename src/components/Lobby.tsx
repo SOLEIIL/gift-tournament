@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { AddGiftsModal } from './AddGiftsModal';
 import { QuickDeposit } from './QuickDeposit';
 import { Player, NFT } from '../types';
-import { TelegramUser } from '../types/telegram';
 import { mockNFTs } from '../utils/mockData';
 
 import { X } from 'lucide-react';
@@ -27,8 +26,6 @@ interface LobbyProps {
   } | null;
   onPageChange: (page: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn') => void;
   currentPage: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn';
-  user?: TelegramUser | null;
-  isTelegram?: boolean;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -40,8 +37,6 @@ export const Lobby: React.FC<LobbyProps> = ({
   topGameStats,
   onPageChange,
   currentPage,
-  user,
-  isTelegram = false,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPlayer] = useState(players[0]); // Mock: always use first player
