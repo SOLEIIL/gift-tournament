@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { NFT } from '../types';
+import { Plus, Gift } from 'lucide-react';
+import { DepositInstructions } from './DepositInstructions';
+import { useDeposit } from '../hooks/useDeposit';
 
 interface InventoryProps {
   onPageChange: (page: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn') => void;
@@ -15,6 +18,9 @@ export const Inventory: React.FC<InventoryProps> = ({
   userGifts,
   totalTON
 }) => {
+  const [showDepositInstructions, setShowDepositInstructions] = useState(false);
+  const { config, hasPendingTransfers, isLoading } = useDeposit();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-4">
       {/* Header */}
@@ -25,6 +31,26 @@ export const Inventory: React.FC<InventoryProps> = ({
         </div>
         <div className="text-sm text-gray-400">
           {userGifts.length} gift{userGifts.length !== 1 ? 's' : ''} in collection
+        </div>
+        
+        {/* Deposit Button */}
+        <div className="mt-4">
+          <Button
+            onClick={() => setShowDepositInstructions(true)}
+            variant="ton"
+            size="lg"
+            className="w-full max-w-xs"
+            disabled={isLoading}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {isLoading ? 'Loading...' : 'Déposer des Gifts'}
+          </Button>
+          
+          {hasPendingTransfers && (
+            <div className="mt-2 text-sm text-amber-400">
+              ⏳ Transferts en cours de traitement...
+            </div>
+          )}
         </div>
       </div>
 
@@ -159,6 +185,14 @@ export const Inventory: React.FC<InventoryProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Deposit Instructions Modal */}
+      {showDepositInstructions && (
+        <DepositInstructions
+          config={config}
+          onClose={() => setShowDepositInstructions(false)}
+        />
+      )}
     </div>
   );
 };
