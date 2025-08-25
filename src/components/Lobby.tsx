@@ -314,19 +314,17 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   return (
     <div className="min-h-screen bg-background p-3">
-      {/* Test Panel Toggle Only */}
-       <div className="bg-card border border-border rounded-lg p-3 mb-3">
-         <div className="flex items-center justify-end">
-           <Button
-             variant="outline"
-             size="sm"
-             onClick={() => setShowTestPanel(!showTestPanel)}
-             className="text-xs"
-           >
-             {showTestPanel ? '🔒 Hide Test' : '🧪 Test Panel'}
-           </Button>
-         </div>
-       </div>
+      {/* Test Panel Button - Fixed Position */}
+      <div className="fixed top-4 right-4 z-50">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowTestPanel(!showTestPanel)}
+          className="text-xs bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card"
+        >
+          {showTestPanel ? '🔒 Hide' : '🧪 Test'}
+        </Button>
+      </div>
 
                   {/* Last Game & Top Game Cards */}
             <div className="flex gap-2 mb-2">
