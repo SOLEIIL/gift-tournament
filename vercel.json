@@ -26,10 +26,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "VITE_TELEGRAM_BOT_TOKEN": "@telegram_bot_token",
-    "VITE_API_BASE_URL": "@api_base_url",
-    "VITE_DEV_MODE": "false"
-  }
+  ]
 }
