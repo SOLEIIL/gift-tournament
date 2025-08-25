@@ -118,18 +118,21 @@ export const DepositInstructions: React.FC<DepositInstructionsProps> = ({
                  <span className="text-white text-xs font-bold">3</span>
                </div>
                <div className="flex-1">
-                 <h3 className="font-medium text-white mb-2">Envoyer votre gift Telegram</h3>
-                 <div className="space-y-2">
-                   <p className="text-sm text-muted-foreground">
-                     Envoyez un gift au compte de dépôt :
-                   </p>
-                   <ul className="text-xs text-muted-foreground space-y-1 ml-2">
-                     <li>• 🎁 Stickers ou emojis</li>
-                     <li>• 💎 GIFs animés</li>
-                     <li>• 🌟 Messages avec "5 TON" ou "gift 10"</li>
-                     <li>• ✨ Documents ou médias</li>
-                   </ul>
-                 </div>
+                                   <h3 className="font-medium text-white mb-2">Envoyer votre gift natif Telegram</h3>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Envoyez un gift natif Telegram au compte de dépôt :
+                    </p>
+                    <ul className="text-xs text-muted-foreground space-y-1 ml-2">
+                      <li>• 🎁 Gifts natifs Telegram (stickers, emojis)</li>
+                      <li>• 💎 NFTs et tokens de valeur</li>
+                      <li>• 🌟 Messages avec "5 TON" ou "gift 10"</li>
+                      <li>• ✨ Objets virtuels de collection</li>
+                    </ul>
+                    <p className="text-xs text-amber-400 mt-2">
+                      ⚠️ Seuls les gifts natifs Telegram sont acceptés (pas les stickers de chat)
+                    </p>
+                  </div>
                </div>
              </div>
            </div>

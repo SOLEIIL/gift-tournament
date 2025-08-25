@@ -107,42 +107,71 @@ class TelegramMonitor {
     return chatUsername === this.config.depositAccountUsername;
   }
 
-  // Détecter un transfert de gift Telegram
+  // Détecter un transfert de gift natif Telegram
   isGiftTransfer(message) {
     try {
-      // Vérifier que le message contient des médias
-      if (!message.media) return false;
-      
-      // Détecter différents types de gifts Telegram
-      const mediaType = message.media.className;
-      
-      // 1. Stickers (gifts visuels)
-      if (mediaType === 'MessageMediaDocument' && message.media.document?.mimeType?.includes('sticker')) {
-        return true;
-      }
-      
-      // 2. GIFs animés
-      if (mediaType === 'MessageMediaDocument' && message.media.document?.mimeType?.includes('gif')) {
-        return true;
-      }
-      
-      // 3. Emojis spéciaux (messages avec emojis de gifts)
-      if (mediaType === 'MessageMediaUnsupported' && message.text) {
-        const giftEmojis = ['🎁', '💎', '🌟', '💫', '✨', '🎉', '🎊', '🏆', '🥇', '🥈', '🥉'];
-        return giftEmojis.some(emoji => message.text.includes(emoji));
-      }
-      
-      // 4. Messages avec le mot "gift" ou "ton"
-      if (message.text && !message.media) {
-        const giftKeywords = ['gift', 'ton', 'crypto', 'nft', 'token', 'coin'];
+      // 1. Vérifier les messages avec des emojis de gifts
+      if (message.text) {
+        const giftEmojis = ['🎁', '💎', '🌟', '💫', '✨', '🎉', '🎊', '🏆', '🥇', '🥈', '🥉', '🎯', '💝', '🎪', '🎭'];
+        if (giftEmojis.some(emoji => message.text.includes(emoji))) {
+          return true;
+        }
+        
+        // Vérifier les mots-clés de gifts
+        const giftKeywords = ['gift', 'ton', 'crypto', 'nft', 'token', 'coin', 'present', 'donation'];
         const messageLower = message.text.toLowerCase();
-        return giftKeywords.some(keyword => messageLower.includes(keyword));
+        if (giftKeywords.some(keyword => messageLower.includes(keyword))) {
+          return true;
+        }
+      }
+      
+      // 2. Vérifier les médias (stickers, GIFs, documents)
+      if (message.media) {
+        const mediaType = message.media.className;
+        
+        if (mediaType === 'MessageMediaDocument') {
+          const document = message.media.document;
+          
+          // Sticker Telegram natif
+          if (document?.mimeType?.includes('sticker')) {
+            return true;
+          }
+          
+          // GIF animé
+          if (document?.mimeType?.includes('gif')) {
+            return true;
+          }
+          
+          // Document avec nom de gift
+          if (document?.attributes) {
+            const fileNameAttr = document.attributes.find(attr => attr.className === 'DocumentAttributeFilename');
+            if (fileNameAttr?.fileName) {
+              const fileName = fileNameAttr.fileName.toLowerCase();
+              const giftExtensions = ['.gift', '.ton', '.crypto', '.nft', '.token'];
+              if (giftExtensions.some(ext => fileName.includes(ext))) {
+                return true;
+              }
+            }
+          }
+        }
+        
+        // Messages avec emojis spéciaux
+        if (mediaType === 'MessageMediaUnsupported' && message.text) {
+          const giftEmojis = ['🎁', '💎', '🌟', '💫', '✨', '🎉', '🎊', '🏆', '🥇', '🥈', '🥉'];
+          return giftEmojis.some(emoji => message.text.includes(emoji));
+        }
+      }
+      
+      // 3. Vérifier les messages de groupe/canal avec gifts
+      if (message.action && message.action.className === 'MessageActionChatAddUser') {
+        // Message d'ajout d'utilisateur (peut indiquer un gift)
+        return true;
       }
       
       return false;
       
     } catch (error) {
-      console.error('❌ Erreur lors de la détection du gift Telegram:', error);
+      console.error('❌ Erreur lors de la détection du gift natif Telegram:', error);
       return false;
     }
   }
@@ -175,6 +204,7 @@ class TelegramMonitor {
         giftName: giftInfo.name,
         giftValue: giftInfo.value,
         giftType: giftInfo.type,
+        giftRarity: giftInfo.rarity,
         mediaType: giftInfo.mediaType,
         timestamp: new Date(message.date * 1000),
         status: 'pending',
@@ -202,12 +232,13 @@ class TelegramMonitor {
     }
   }
 
-  // Extraire les informations du gift Telegram
+  // Extraire les informations du gift natif Telegram
   async extractGiftInfo(message) {
     try {
       let giftName = 'Telegram Gift';
       let giftValue = 1; // Valeur par défaut
       let giftType = 'unknown';
+      let giftRarity = 'common';
       
       // Analyser le type de média
       if (message.media) {
@@ -216,31 +247,46 @@ class TelegramMonitor {
         if (mediaType === 'MessageMediaDocument') {
           const document = message.media.document;
           
-          // Sticker
+          // Sticker Telegram natif
           if (document?.mimeType?.includes('sticker')) {
             giftType = 'sticker';
-            giftName = 'Sticker Gift';
-            giftValue = this.extractValueFromText(message.text) || 5; // Stickers valent 5 TON par défaut
+            giftName = this.extractGiftNameFromText(message.text) || 'Sticker Gift';
+            giftValue = this.extractValueFromText(message.text) || 5;
+            giftRarity = this.calculateRarity(giftValue);
           }
-          // GIF
+          // GIF animé
           else if (document?.mimeType?.includes('gif')) {
             giftType = 'gif';
-            giftName = 'GIF Gift';
-            giftValue = this.extractValueFromText(message.text) || 10; // GIFs valent 10 TON par défaut
+            giftName = this.extractGiftNameFromText(message.text) || 'GIF Gift';
+            giftValue = this.extractValueFromText(message.text) || 10;
+            giftRarity = this.calculateRarity(giftValue);
           }
-          // Autre document
-          else {
-            giftType = 'document';
-            giftName = document?.attributes?.find(attr => attr.className === 'DocumentAttributeFilename')?.fileName || 'Document Gift';
-            giftValue = this.extractValueFromText(message.text) || 15; // Documents valent 15 TON par défaut
+          // Document avec extension gift
+          else if (document?.attributes) {
+            const fileNameAttr = document.attributes.find(attr => attr.className === 'DocumentAttributeFilename');
+            if (fileNameAttr?.fileName) {
+              const fileName = fileNameAttr.fileName;
+              giftType = 'document';
+              giftName = fileName;
+              giftValue = this.extractValueFromFileName(fileName) || this.extractValueFromText(message.text) || 15;
+              giftRarity = this.calculateRarity(giftValue);
+            }
           }
         }
-        // Message texte avec emojis
+        // Message texte avec emojis spéciaux
         else if (message.text) {
           giftType = 'emoji';
           giftName = this.extractGiftNameFromText(message.text);
           giftValue = this.extractValueFromText(message.text) || 1;
+          giftRarity = this.calculateRarity(giftValue);
         }
+      }
+      // Message texte pur
+      else if (message.text) {
+        giftType = 'text';
+        giftName = this.extractGiftNameFromText(message.text);
+        giftValue = this.extractValueFromText(message.text) || 1;
+        giftRarity = this.calculateRarity(giftValue);
       }
       
       // Analyser le texte du message pour extraire la valeur
@@ -248,6 +294,7 @@ class TelegramMonitor {
         const extractedValue = this.extractValueFromText(message.text);
         if (extractedValue) {
           giftValue = extractedValue;
+          giftRarity = this.calculateRarity(giftValue);
         }
       }
       
@@ -255,15 +302,17 @@ class TelegramMonitor {
         name: giftName,
         value: giftValue,
         type: giftType,
+        rarity: giftRarity,
         mediaType: message.media?.className || 'text'
       };
       
     } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction des infos du gift Telegram:', error);
+      console.error('❌ Erreur lors de l\'extraction des infos du gift natif:', error);
       return {
         name: 'Telegram Gift',
         value: 1,
         type: 'unknown',
+        rarity: 'common',
         mediaType: 'text'
       };
     }
@@ -314,7 +363,11 @@ class TelegramMonitor {
         '🏆': 'Trophy Gift',
         '🥇': 'Gold Medal Gift',
         '🥈': 'Silver Medal Gift',
-        '🥉': 'Bronze Medal Gift'
+        '🥉': 'Bronze Medal Gift',
+        '🎯': 'Target Gift',
+        '💝': 'Heart Gift',
+        '🎪': 'Circus Gift',
+        '🎭': 'Theater Gift'
       };
       
       for (const [emoji, name] of Object.entries(giftKeywords)) {
@@ -327,10 +380,48 @@ class TelegramMonitor {
       if (text.toLowerCase().includes('gift')) return 'Text Gift';
       if (text.toLowerCase().includes('ton')) return 'TON Gift';
       if (text.toLowerCase().includes('crypto')) return 'Crypto Gift';
+      if (text.toLowerCase().includes('nft')) return 'NFT Gift';
+      if (text.toLowerCase().includes('token')) return 'Token Gift';
       
       return 'Telegram Gift';
     } catch (error) {
       return 'Telegram Gift';
+    }
+  }
+  
+  // Calculer la rareté basée sur la valeur
+  calculateRarity(value) {
+    if (value >= 1000) return 'legendary';
+    if (value >= 500) return 'epic';
+    if (value >= 100) return 'rare';
+    return 'common';
+  }
+  
+  // Extraire la valeur depuis le nom de fichier
+  extractValueFromFileName(fileName) {
+    if (!fileName) return null;
+    
+    try {
+      // Chercher des patterns comme "gift_5_ton.gift" ou "10TON.nft"
+      const patterns = [
+        /(\d+)\s*ton/i,
+        /(\d+)\s*toncoin/i,
+        /gift_(\d+)/i,
+        /(\d+)ton/i,
+        /(\d+)\s*coin/i,
+        /(\d+)\s*token/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = fileName.match(pattern);
+        if (match) {
+          return parseInt(match[1]);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
     }
   }
 

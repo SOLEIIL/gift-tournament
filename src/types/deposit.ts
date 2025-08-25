@@ -7,6 +7,7 @@ export interface DepositTransfer {
   giftName: string;
   giftValue: number;
   giftType: 'sticker' | 'gif' | 'document' | 'emoji' | 'text' | 'unknown';
+  giftRarity: 'common' | 'rare' | 'epic' | 'legendary';
   mediaType: string;
   timestamp: Date;
   status: 'pending' | 'confirmed' | 'failed' | 'processed';
