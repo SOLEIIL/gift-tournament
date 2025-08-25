@@ -26,7 +26,7 @@ export const Round: React.FC<RoundProps> = ({ players, pot, logs, roundPhase }) 
 
       {/* Players Grid */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        {activePlayers.map((player, index) => (
+        {activePlayers.map((player) => (
           <div
             key={player.id}
             className="bg-card border border-border rounded-lg p-4 text-center"

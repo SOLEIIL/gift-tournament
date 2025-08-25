@@ -321,7 +321,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   return (
     <div className="min-h-screen bg-background p-4">
       {/* Telegram User Info */}
-      <TelegramUserInfo user={user} isTelegram={isTelegram} />
+      <TelegramUserInfo user={user || null} isTelegram={isTelegram} />
       
       {/* Test Panel Toggle Only */}
        <div className="bg-card border border-border rounded-lg p-4 mb-6">

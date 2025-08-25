@@ -20,15 +20,11 @@ function App() {
   } = useTournamentState();
 
   const {
-    webApp,
     user,
     themeParams,
     isTelegram,
     isReady,
-    expandApp,
-    closeApp,
-    showAlert,
-    hapticFeedback
+    expandApp
   } = useTelegram();
 
   const renderCurrentPage = () => {
@@ -88,7 +84,7 @@ function App() {
             players={state.players}
             pot={state.pot}
             logs={state.logs}
-            roundPhase={state.roundPhase}
+            roundPhase={state.roundPhase.toString()}
           />
         );
       

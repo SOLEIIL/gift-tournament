@@ -42,7 +42,7 @@ export const Inventory: React.FC<InventoryProps> = ({
                 </div>
                 <div className="text-white font-semibold mb-1">{gift.name}</div>
                 <div className="text-sm text-muted-foreground mb-2">
-                  {gift.description || 'A special gift'}
+                  A special gift
                 </div>
                 <div className="text-ton font-bold text-lg">{gift.value} TON</div>
                 <div className="text-xs text-muted-foreground mt-1">

@@ -23,9 +23,6 @@ export interface TelegramWebApp {
   headerColor: string;
   backgroundColor: string;
   isClosingConfirmationEnabled: boolean;
-  BackButton: BackButton;
-  MainButton: MainButton;
-  HapticFeedback: HapticFeedback;
   CloudStorage: CloudStorage;
   onEvent(eventType: string, eventHandler: Function): void;
   offEvent(eventType: string, eventHandler: Function): void;

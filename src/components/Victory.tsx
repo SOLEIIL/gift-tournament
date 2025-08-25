@@ -43,7 +43,7 @@ export const Victory: React.FC<VictoryProps> = ({ winner, totalPot, onPlayAgain 
         <div className="mb-8">
           <h3 className="text-lg font-semibold text-white mb-3">Winner's Gifts</h3>
           <div className="grid grid-cols-3 gap-2">
-            {winner.nfts.map((nft, index) => (
+            {winner.nfts.map((nft) => (
               <div
                 key={nft.id}
                 className="bg-muted/20 rounded-lg p-2 text-center"
