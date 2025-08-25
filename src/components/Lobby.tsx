@@ -12,18 +12,6 @@ interface LobbyProps {
   pot: number;
   onAddNFT: (playerId: string, nft: NFT) => void;
   updateGameStats: (winner: Player, gameNumber: number) => void;
-  lastGameStats: {
-    winner: Player | null;
-    winnerGain: number;
-    winnerChance: number;
-    gameNumber: number;
-  } | null;
-  topGameStats: {
-    winner: Player | null;
-    winnerGain: number;
-    winnerChance: number;
-    gameNumber: number;
-  } | null;
   onPageChange: (page: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn') => void;
   currentPage: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn';
 }
@@ -33,8 +21,6 @@ export const Lobby: React.FC<LobbyProps> = ({
   pot,
   onAddNFT,
   updateGameStats,
-  lastGameStats,
-  topGameStats,
   onPageChange,
   currentPage,
 }) => {
