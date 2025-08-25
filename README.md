@@ -13,7 +13,7 @@ Gift Tournament is a competitive NFT-based tournament game where players deposit
 ## ✨ Features
 
 ### Core Gameplay
-- **Telegram Integration**: Automatic user detection and gift inventory loading
+- **Wallet Connection**: Mock wallet integration (ready for real blockchain integration)
 - **NFT Management**: Add gifts individually or use quick deposit for the cheapest available
 - **Tournament Mechanics**: Weighted elimination based on NFT values
 - **Real-time Updates**: Live countdown, elimination logs, and pot tracking
@@ -26,27 +26,42 @@ Gift Tournament is a competitive NFT-based tournament game where players deposit
 
 ### Technical Features
 - **TypeScript**: Full type safety and modern JavaScript features
-- **Telegram API Integration**: Automatic user detection and gift inventory management
 - **State Management**: Custom hooks with React state management
 - **Seeded RNG**: Deterministic elimination for testing and fairness
 - **Component Architecture**: Modular, reusable components
 
-## 🚀 Production Deployment
+## 🚀 Getting Started
 
-### Live Application
-- **Frontend:** https://gift-tournament.vercel.app
-- **Backend:** https://gift-tournament-backend.railway.app
-- **Bot Telegram:** @testnftbuybot
+### Prerequisites
+- Node.js 18+ 
+- pnpm (recommended) or npm
 
-### Quick Start
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd gift-tournament
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
+
+3. **Start development server**
+   ```bash
+   pnpm dev
+   ```
+
+4. **Open your browser**
+   Navigate to `http://localhost:3000`
+
+### Build for Production
+
 ```bash
-# Clone and install
-git clone <repository-url>
-cd gift-tournament
-npm install
-
-# Start development
-npm run dev
+pnpm build
+pnpm preview
 ```
 
 ## 🏗️ Project Structure
@@ -65,7 +80,6 @@ src/
 ├── types/              # TypeScript definitions
 │   └── index.ts        # Game interfaces
 ├── utils/              # Utility functions
-│   ├── telegramService.ts # Telegram integration
 │   ├── mockData.ts     # Sample data
 │   ├── rng.ts          # Seeded random number generator
 │   └── weightedPick.ts # Weighted selection logic
@@ -124,44 +138,11 @@ Custom CSS animations defined in `tailwind.config.js`:
 - **Lazy Loading**: Consider code splitting for larger components
 - **Animation Optimization**: Use CSS transforms for smooth 60fps animations
 
-## 🤖 Telegram Integration
-
-### Bot Setup
-1. **Create a Telegram Bot**
-   - Message [@BotFather](https://t.me/botfather) on Telegram
-   - Use `/newbot` command to create a new bot
-   - Save the bot token provided
-
-2. **Configure Environment Variables**
-   ```bash
-   # Copy the example file
-   cp env.example .env
-   
-   # Add your bot token
-   VITE_TELEGRAM_BOT_TOKEN=your_bot_token_here
-   ```
-
-3. **Bot API Endpoints**
-   The application expects these custom bot endpoints:
-   - `getUserGifts`: Retrieve user's gift inventory
-   - `sendGift`: Transfer gift between users
-   - `canTransferGift`: Check if gift can be transferred
-
-### User Detection
-- **Automatic Detection**: User ID and profile automatically detected via Telegram WebApp
-- **Fallback Mode**: Uses mock data when not running in Telegram environment
-- **Real-time Updates**: Gift inventory refreshes automatically
-
-### Gift Management
-- **Inventory Loading**: Automatically loads user's gifts on app initialization
-- **Transfer System**: Send gifts to other users via Telegram
-- **Ownership Validation**: Verifies gift ownership before transfers
-
 ## 🚀 Deployment
 
 ### Build Optimization
 ```bash
-npm run build
+pnpm build
 ```
 
 The build process:
@@ -172,16 +153,7 @@ The build process:
 ### Hosting
 - **Static Hosting**: Deploy `dist/` folder to any static host
 - **CDN**: Use Cloudflare, AWS CloudFront, or similar
-- **Telegram Mini App**: Deploy to Telegram's Mini App platform
-
-### Production Deployment
-```bash
-# Deploy backend to Railway
-npm run deploy:backend
-
-# Deploy frontend to Vercel
-npm run deploy:frontend
-```
+- **Telegram**: Integrate with Telegram Mini App platform
 
 ## 🔮 Future Enhancements
 

@@ -1,84 +1,152 @@
-import { useState } from 'react';
-import { useTelegramService } from './utils/telegramService';
+
+import { useState, useEffect } from 'react';
+import { useTournamentState } from './hooks/useTournamentState';
+import { useTelegram } from './hooks/useTelegram';
+import { Lobby } from './components/Lobby';
+import { Round } from './components/Round';
+import { Victory } from './components/Victory';
+import { Inventory } from './components/Inventory';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<'inventory' | 'game'>('inventory');
-  const { userGifts } = useTelegramService();
+  const [currentPage, setCurrentPage] = useState<'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn'>('pvp');
   
-  const totalTON = userGifts.reduce((sum, nft) => sum + nft.value, 0);
+  const { 
+    state, 
+    addNFTToPlayer, 
+    resetGame, 
+    updateGameStats, 
+    lastGameStats, 
+    topGameStats 
+  } = useTournamentState();
 
-  if (currentPage === 'inventory') {
-    return (
-      <div className="min-h-screen bg-gray-900 text-white p-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-center mb-8 text-blue-400">
-            🎁 Gift Tournament
-          </h1>
+  const {
+    webApp,
+    user,
+    themeParams,
+    isTelegram,
+    isReady,
+    expandApp,
+    closeApp,
+    showAlert,
+    hapticFeedback
+  } = useTelegram();
+
+  const renderCurrentPage = () => {
+    // Si on n'est pas sur la page PvP, afficher la page correspondante
+    if (currentPage !== 'pvp') {
+      switch (currentPage) {
+        case 'inventory':
+          // Get current player's gifts and total TON value
+          const currentPlayer = state.players[0]; // Mock: always use first player
+          const userGifts = currentPlayer.nfts || [];
+          const totalTON = userGifts.reduce((sum, nft) => sum + nft.value, 0);
           
-          <div className="bg-gray-800 rounded-lg p-6 mb-6">
-            <h2 className="text-2xl font-semibold mb-4">💰 Inventaire Telegram</h2>
-            <div className="text-xl text-green-400 mb-2">
-              Total TON: {totalTON.toFixed(2)} TON
-            </div>
-            <div className="text-gray-300">
-              {userGifts.length} gift(s) disponible(s)
-            </div>
-          </div>
+          return <Inventory 
+            onPageChange={setCurrentPage} 
+            currentPage={currentPage}
+            userGifts={userGifts}
+            totalTON={totalTON}
+          />;
+        case 'rolls':
+          return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+            <div className="text-white text-2xl">Rolls Page - Coming Soon</div>
+          </div>;
+        case 'shop':
+          return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+            <div className="text-white text-2xl">Shop Page - Coming Soon</div>
+          </div>;
+        case 'earn':
+          return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+            <div className="text-white text-2xl">Earn Page - Coming Soon</div>
+          </div>;
+        default:
+          return null;
+      }
+    }
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {userGifts.map((gift) => (
-              <div key={gift.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                <div className="text-center mb-3">
-                  <div className="text-4xl mb-2">{gift.image || '🎁'}</div>
-                  <h3 className="text-lg font-semibold">{gift.name}</h3>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-400 mb-1">
-                    {gift.value} TON
-                  </div>
-                  <div className={`inline-block px-2 py-1 rounded text-sm font-medium ${
-                    gift.rarity === 'legendary' ? 'bg-yellow-600 text-yellow-100' :
-                    gift.rarity === 'epic' ? 'bg-purple-600 text-purple-100' :
-                    gift.rarity === 'rare' ? 'bg-blue-600 text-blue-100' :
-                    'bg-gray-600 text-gray-100'
-                  }`}>
-                    {gift.rarity}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+    // Page PvP - logique du tournoi
+    switch (state.phase) {
+      case 'LOBBY':
+        return (
+          <Lobby
+            players={state.players}
+            pot={state.pot}
+            onAddNFT={addNFTToPlayer}
+            updateGameStats={updateGameStats}
+            lastGameStats={lastGameStats}
+            topGameStats={topGameStats}
+            onPageChange={setCurrentPage}
+            currentPage={currentPage}
+            user={user}
+            isTelegram={isTelegram}
+          />
+        );
+      
+      case 'RUNNING':
+        return (
+          <Round
+            players={state.players}
+            pot={state.pot}
+            logs={state.logs}
+            roundPhase={state.roundPhase}
+          />
+        );
+      
+      case 'FINALIZED':
+        const winner = state.players.find(p => p.nfts.length > 0);
+        if (winner) {
+          return (
+            <Victory
+              winner={winner}
+              totalPot={state.pot}
+              onPlayAgain={resetGame}
+            />
+          );
+        }
+        return null;
+      
+      default:
+        return null;
+    }
+  };
 
-          <div className="text-center mt-8">
-            <button 
-              onClick={() => setCurrentPage('game')}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors"
-            >
-              🎮 Jouer au Tournoi
-            </button>
-          </div>
+  // Apply Telegram theme colors if available
+  useEffect(() => {
+    if (themeParams.bg_color) {
+      document.documentElement.style.setProperty('--tg-bg-color', themeParams.bg_color);
+    }
+    if (themeParams.text_color) {
+      document.documentElement.style.setProperty('--tg-text-color', themeParams.text_color);
+    }
+    if (themeParams.button_color) {
+      document.documentElement.style.setProperty('--tg-button-color', themeParams.button_color);
+    }
+    if (themeParams.button_text_color) {
+      document.documentElement.style.setProperty('--tg-button-text-color', themeParams.button_text_color);
+    }
+  }, [themeParams]);
 
-          <div className="text-center mt-4 text-gray-400">
-            <p>Bot Telegram: @testnftbuybot</p>
-            <p>Intégration automatique des gifts</p>
-          </div>
-        </div>
+  // Expand app when ready
+  useEffect(() => {
+    if (isReady && isTelegram) {
+      expandApp();
+    }
+  }, [isReady, isTelegram, expandApp]);
+
+  if (!isReady) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">🎮 Tournoi en Développement</h1>
-        <p className="text-xl text-gray-300 mb-6">Le système de tournoi sera bientôt disponible !</p>
-        <button 
-          onClick={() => setCurrentPage('inventory')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
-        >
-          ← Retour à l'Inventaire
-        </button>
-      </div>
+    <div className="App" style={{
+      backgroundColor: themeParams.bg_color || '#1a1a1a',
+      color: themeParams.text_color || '#ffffff'
+    }}>
+      {renderCurrentPage()}
     </div>
   );
 }
