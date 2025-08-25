@@ -1,6 +1,5 @@
-import { NFT } from '../types';
+import React from 'react';
 
-// Types pour l'API Telegram
 interface TelegramUser {
   id: number;
   first_name: string;
@@ -9,37 +8,29 @@ interface TelegramUser {
   language_code?: string;
 }
 
-interface TelegramInitData {
-  user?: TelegramUser;
-  chat_instance?: string;
-  chat_type?: string;
-  start_param?: string;
-  can_send_after?: number;
-  auth_date: number;
-  hash: string;
-}
-
 interface TelegramGift {
   id: string;
   name: string;
-  image: string;
   value: number;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  owner_id: number;
-  transfer_date?: string;
+  image?: string;
 }
 
-// Configuration Telegram
-const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-const TELEGRAM_API_BASE = import.meta.env.VITE_DEV_MODE === 'true' 
-  ? 'http://localhost:3001' 
-  : 'https://api.telegram.org/bot';
+// Types Vite pour les variables d'environnement
+declare global {
+  interface ImportMeta {
+    readonly env: {
+      readonly VITE_TELEGRAM_BOT_TOKEN: string;
+      readonly VITE_API_BASE_URL: string;
+      readonly VITE_DEV_MODE: string;
+    };
+  }
+}
 
-// Service pour gérer l'intégration Telegram
-export class TelegramService {
+class TelegramService {
   private static instance: TelegramService;
-  private currentUser: TelegramUser | null = null;
-  private userGifts: NFT[] = [];
+  private user: TelegramUser | null = null;
+  private userGifts: TelegramGift[] = [];
 
   private constructor() {}
 
@@ -50,280 +41,237 @@ export class TelegramService {
     return TelegramService.instance;
   }
 
-  // Initialiser le service avec les données Telegram
-  async initialize(): Promise<TelegramUser | null> {
+  async initialize(): Promise<void> {
     try {
-      // Vérifier si on est dans un Mini App Telegram
-      if (window.Telegram?.WebApp) {
-        const webApp = window.Telegram.WebApp;
+      // Détecter Telegram WebApp
+      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+        const webApp = (window as any).Telegram.WebApp;
+        this.user = {
+          id: webApp.initDataUnsafe?.user?.id || 123456789,
+          first_name: webApp.initDataUnsafe?.user?.first_name || 'Test User',
+          last_name: webApp.initDataUnsafe?.user?.last_name,
+          username: webApp.initDataUnsafe?.user?.username,
+          language_code: webApp.initDataUnsafe?.user?.language_code
+        };
         
-        // Initialiser l'app
-        webApp.ready();
-        
-        // Récupérer les données utilisateur
-        if (webApp.initDataUnsafe?.user) {
-          this.currentUser = webApp.initDataUnsafe.user;
-          
-          // Charger automatiquement l'inventaire de l'utilisateur
-          await this.loadUserGifts();
-          
-          return this.currentUser;
-        }
-      }
-      
-      // Fallback pour le développement
-      console.log('Telegram WebApp not available, using mock data');
-      return null;
-    } catch (error) {
-      console.error('Error initializing Telegram service:', error);
-      return null;
-    }
-  }
-
-  // Récupérer l'utilisateur actuel
-  getCurrentUser(): TelegramUser | null {
-    return this.currentUser;
-  }
-
-  // Charger l'inventaire des gifts de l'utilisateur depuis l'API Telegram
-  async loadUserGifts(): Promise<NFT[]> {
-    if (!this.currentUser) {
-      console.warn('No current user, cannot load gifts');
-      return [];
-    }
-
-    try {
-      // Appel à l'API Telegram pour récupérer les gifts
-      const response = await fetch(`${TELEGRAM_API_BASE}${TELEGRAM_BOT_TOKEN}/getUserGifts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: this.currentUser.id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.ok && data.result) {
-        // Convertir les gifts Telegram en format NFT
-        this.userGifts = data.result.map((gift: TelegramGift) => ({
-          id: gift.id,
-          name: gift.name,
-          image: gift.image,
-          value: gift.value,
-          rarity: gift.rarity,
-        }));
-        
-        return this.userGifts;
+        // Charger les gifts de l'utilisateur
+        await this.loadUserGifts();
       } else {
-        console.error('Failed to load user gifts:', data);
-        return [];
+        // Mode développement - utiliser des données mock
+        this.user = {
+          id: 123456789,
+          first_name: 'Test User',
+          username: 'testuser'
+        };
+        this.userGifts = this.getMockUserGifts();
       }
     } catch (error) {
-      console.error('Error loading user gifts:', error);
-      
-      // Fallback: utiliser des données mock pour le développement
-      return this.getMockUserGifts();
+      console.error('Erreur lors de l\'initialisation Telegram:', error);
+      // Fallback vers les données mock
+      this.user = {
+        id: 123456789,
+        first_name: 'Test User',
+        username: 'testuser'
+      };
+      this.userGifts = this.getMockUserGifts();
     }
   }
 
-  // Récupérer les gifts de l'utilisateur (depuis le cache local)
-  getUserGifts(): NFT[] {
-    return this.userGifts;
-  }
-
-  // Rafraîchir l'inventaire
-  async refreshUserGifts(): Promise<NFT[]> {
-    return await this.loadUserGifts();
-  }
-
-  // Envoyer un gift à un autre utilisateur
-  async sendGift(targetUserId: number, giftId: string): Promise<boolean> {
-    if (!this.currentUser) {
-      console.error('No current user');
-      return false;
-    }
-
+  private async loadUserGifts(): Promise<void> {
     try {
-      const response = await fetch(`${TELEGRAM_API_BASE}${TELEGRAM_BOT_TOKEN}/sendGift`, {
+      const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+      const TELEGRAM_API_BASE = import.meta.env.VITE_DEV_MODE === 'true'
+        ? 'http://localhost:3001'
+        : 'https://api.telegram.org/bot';
+
+      if (!TELEGRAM_BOT_TOKEN) {
+        console.warn('Token Telegram non configuré, utilisation des données mock');
+        this.userGifts = this.getMockUserGifts();
+        return;
+      }
+
+      const response = await fetch(`${TELEGRAM_API_BASE}/bot:${TELEGRAM_BOT_TOKEN}/getUserGifts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from_user_id: this.currentUser.id,
-          to_user_id: targetUserId,
-          gift_id: giftId,
-        }),
+          user_id: this.user?.id || 123456789
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        this.userGifts = data.gifts || [];
+      } else {
+        console.warn('Erreur lors du chargement des gifts, utilisation des données mock');
+        this.userGifts = this.getMockUserGifts();
       }
+    } catch (error) {
+      console.error('Erreur lors du chargement des gifts:', error);
+      this.userGifts = this.getMockUserGifts();
+    }
+  }
 
-      const data = await response.json();
-      
-      if (data.ok) {
-        // Rafraîchir l'inventaire après envoi
+  async sendGift(giftId: string, toUserId: number): Promise<boolean> {
+    try {
+      const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+      const TELEGRAM_API_BASE = import.meta.env.VITE_DEV_MODE === 'true'
+        ? 'http://localhost:3001'
+        : 'https://api.telegram.org/bot';
+
+      const response = await fetch(`${TELEGRAM_API_BASE}/bot:${TELEGRAM_BOT_TOKEN}/sendGift`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from_user_id: this.user?.id,
+          to_user_id: toUserId,
+          gift_id: giftId
+        })
+      });
+
+      if (response.ok) {
+        // Rafraîchir la liste des gifts
         await this.loadUserGifts();
         return true;
-      } else {
-        console.error('Failed to send gift:', data);
-        return false;
       }
+      return false;
     } catch (error) {
-      console.error('Error sending gift:', error);
+      console.error('Erreur lors de l\'envoi du gift:', error);
       return false;
     }
   }
 
-  // Vérifier si un gift peut être transféré
   async canTransferGift(giftId: string): Promise<boolean> {
-    if (!this.currentUser) {
-      return false;
-    }
-
-    const gift = this.userGifts.find(g => g.id === giftId);
-    if (!gift) {
-      return false;
-    }
-
-    // Vérifier les règles de transfert (ex: délai minimum, etc.)
     try {
-      const response = await fetch(`${TELEGRAM_API_BASE}${TELEGRAM_BOT_TOKEN}/canTransferGift`, {
+      const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+      const TELEGRAM_API_BASE = import.meta.env.VITE_DEV_MODE === 'true'
+        ? 'http://localhost:3001'
+        : 'https://api.telegram.org/bot';
+
+      const response = await fetch(`${TELEGRAM_API_BASE}/bot:${TELEGRAM_BOT_TOKEN}/canTransferGift`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: this.currentUser.id,
-          gift_id: giftId,
-        }),
+          user_id: this.user?.id,
+          gift_id: giftId
+        })
       });
 
-      if (!response.ok) {
-        return false;
+      if (response.ok) {
+        const data = await response.json();
+        return data.can_transfer || false;
       }
-
-      const data = await response.json();
-      return data.ok && data.result?.can_transfer === true;
+      return false;
     } catch (error) {
-      console.error('Error checking gift transfer:', error);
+      console.error('Erreur lors de la vérification du transfert:', error);
       return false;
     }
   }
 
-  // Données mock pour le développement
-  private getMockUserGifts(): NFT[] {
+  private getMockUserGifts(): TelegramGift[] {
     return [
-      { id: "user_001", name: "Gift Box #001", image: "🎁", value: 5, rarity: "common" },
-      { id: "user_002", name: "Gift Box #002", image: "🎁", value: 8, rarity: "common" },
-      { id: "user_003", name: "Gift Box #003", image: "🎁", value: 12, rarity: "rare" },
-      { id: "user_004", name: "Gift Box #004", image: "🎁", value: 15, rarity: "rare" },
-      { id: "user_005", name: "Gift Box #005", image: "🎁", value: 20, rarity: "epic" },
+      {
+        id: 'gift_001',
+        name: 'Golden NFT',
+        value: 150,
+        rarity: 'legendary',
+        image: 'https://via.placeholder.com/150x150/FFD700/000000?text=Golden+NFT'
+      },
+      {
+        id: 'gift_002',
+        name: 'Silver Coin',
+        value: 75,
+        rarity: 'epic',
+        image: 'https://via.placeholder.com/150x150/C0C0C0/000000?text=Silver+Coin'
+      },
+      {
+        id: 'gift_003',
+        name: 'Bronze Medal',
+        value: 45,
+        rarity: 'rare',
+        image: 'https://via.placeholder.com/150x150/CD7F32/000000?text=Bronze+Medal'
+      },
+      {
+        id: 'gift_004',
+        name: 'Iron Token',
+        value: 25,
+        rarity: 'common',
+        image: 'https://via.placeholder.com/150x150/808080/000000?text=Iron+Token'
+      },
+      {
+        id: 'gift_005',
+        name: 'Wooden Charm',
+        value: 15,
+        rarity: 'common',
+        image: 'https://via.placeholder.com/150x150/8B4513/000000?text=Wooden+Charm'
+      }
     ];
   }
 
-  // Obtenir le nom d'affichage de l'utilisateur
   getUserDisplayName(): string {
-    if (!this.currentUser) {
-      return 'Anonymous';
-    }
-
-    if (this.currentUser.username) {
-      return `@${this.currentUser.username}`;
-    }
-
-    return this.currentUser.first_name + (this.currentUser.last_name ? ` ${this.currentUser.last_name}` : '');
+    if (!this.user) return 'Unknown User';
+    return this.user.last_name 
+      ? `${this.user.first_name} ${this.user.last_name}`
+      : this.user.first_name;
   }
 
-  // Obtenir les initiales de l'utilisateur
   getUserInitials(): string {
-    if (!this.currentUser) {
-      return 'A';
-    }
+    if (!this.user) return 'U';
+    return this.user.first_name.charAt(0).toUpperCase() + 
+           (this.user.last_name?.charAt(0).toUpperCase() || '');
+  }
 
-    const first = this.currentUser.first_name.charAt(0).toUpperCase();
-    const last = this.currentUser.last_name ? this.currentUser.last_name.charAt(0).toUpperCase() : '';
-    
-    return first + last;
+  // Getters publics
+  get currentUser(): TelegramUser | null {
+    return this.user;
+  }
+
+  get currentUserGifts(): TelegramGift[] {
+    return [...this.userGifts];
+  }
+
+  async refreshGifts(): Promise<void> {
+    await this.loadUserGifts();
   }
 }
 
-import React from 'react';
-
-// Hook React pour utiliser le service Telegram
-export const useTelegramService = () => {
-  const [telegramService] = React.useState(() => TelegramService.getInstance());
-  const [user, setUser] = React.useState<TelegramUser | null>(null);
-  const [userGifts, setUserGifts] = React.useState<NFT[]>([]);
+// Hook React pour utiliser le service
+export function useTelegramService() {
+  const [service] = React.useState(() => TelegramService.getInstance());
+  const [user, setUser] = React.useState(service.currentUser);
+  const [userGifts, setUserGifts] = React.useState(service.currentUserGifts);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    const initializeService = async () => {
+    const init = async () => {
       setIsLoading(true);
-      try {
-        const currentUser = await telegramService.initialize();
-        setUser(currentUser);
-        
-        const gifts = await telegramService.loadUserGifts();
-        setUserGifts(gifts);
-      } catch (error) {
-        console.error('Error initializing Telegram service:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      await service.initialize();
+      setUser(service.currentUser);
+      setUserGifts(service.currentUserGifts);
+      setIsLoading(false);
     };
 
-    initializeService();
-  }, [telegramService]);
+    init();
+  }, [service]);
 
   const refreshGifts = React.useCallback(async () => {
-    const gifts = await telegramService.refreshUserGifts();
-    setUserGifts(gifts);
-  }, [telegramService]);
-
-  const sendGift = React.useCallback(async (targetUserId: number, giftId: string) => {
-    const success = await telegramService.sendGift(targetUserId, giftId);
-    if (success) {
-      await refreshGifts();
-    }
-    return success;
-  }, [telegramService, refreshGifts]);
+    await service.refreshGifts();
+    setUserGifts(service.currentUserGifts);
+  }, [service]);
 
   return {
     user,
     userGifts,
     isLoading,
     refreshGifts,
-    sendGift,
-    getUserDisplayName: () => telegramService.getUserDisplayName(),
-    getUserInitials: () => telegramService.getUserInitials(),
+    sendGift: service.sendGift.bind(service),
+    canTransferGift: service.canTransferGift.bind(service),
+    getUserDisplayName: service.getUserDisplayName.bind(service),
+    getUserInitials: service.getUserInitials.bind(service)
   };
-};
-
-// Déclaration des types globaux pour Telegram
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp: {
-        ready: () => void;
-        initDataUnsafe?: {
-          user?: TelegramUser;
-          chat_instance?: string;
-          chat_type?: string;
-          start_param?: string;
-          can_send_after?: number;
-          auth_date: number;
-          hash: string;
-        };
-      };
-    };
-  }
 }
