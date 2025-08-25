@@ -7,10 +7,18 @@ import {
   UserInventory, 
   DepositAccount 
 } from '../types/deposit';
-import { getDepositConfig } from '../config/deposit';
 
-// Configuration du compte de dépôt
-const DEFAULT_DEPOSIT_CONFIG: DepositConfig = getDepositConfig();
+// Configuration du compte de dépôt @WxyzCrypto
+const DEFAULT_DEPOSIT_CONFIG: DepositConfig = {
+  depositAccountUsername: 'WxyzCrypto',
+  depositAccountPhone: '+1234567890', // À remplacer par votre vrai numéro
+  webhookUrl: 'https://gift-tournament-git-main-soleiils-projects.vercel.app/api/deposit-webhook',
+  apiKey: process.env.REACT_APP_DEPOSIT_API_KEY || 'wxyz-crypto-secure-key-2024',
+  minTransferValue: 1,
+  maxTransferValue: 10000,
+  autoConfirm: true,
+  confirmationDelay: 30
+};
 
 export const useDeposit = () => {
   const { user, isTelegram } = useTelegram();
