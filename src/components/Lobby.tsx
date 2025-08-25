@@ -329,7 +329,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   {/* Last Game & Top Game Cards */}
             <div className="flex gap-2 mb-2">
               {/* Last Game Card */}
-              <div className="flex-1 bg-card border border-border rounded-lg p-2">
+              <div className="flex-1 bg-card border border-border rounded-lg p-2 overflow-hidden">
                 <div className="flex items-center justify-between min-h-[40px]">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="w-5 h-5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -356,7 +356,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
 
               {/* Top Game Card */}
-              <div className="flex-1 bg-card border border-border rounded-lg p-2">
+              <div className="flex-1 bg-card border border-border rounded-lg p-2 overflow-hidden">
                 <div className="flex items-center justify-between min-h-[40px]">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="w-5 h-5 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center flex-shrink-0">
