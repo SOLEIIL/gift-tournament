@@ -331,24 +331,24 @@ export const Lobby: React.FC<LobbyProps> = ({
               {/* Last Game Card */}
               <div className="flex-1 bg-card border border-border rounded-lg p-2">
                 <div className="flex items-center justify-between min-h-[40px]">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="w-5 h-5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-bold text-xs">
                         {lastGameStats?.winner?.shortName?.charAt(0) || 'P'}
                       </span>
                     </div>
-                    <div className="flex flex-col min-w-0 gap-0.5">
+                    <div className="flex flex-col min-w-0 gap-0.5 flex-1">
                       <p className="font-medium text-white text-xs truncate">
                         {lastGameStats?.winner ? `@${lastGameStats.winner.shortName}...` : '@pavlo...'}
                       </p>
-                      <p className="text-xs text-muted-foreground">LAST GAME</p>
+                      <p className="text-xs text-muted-foreground truncate">LAST GAME</p>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end justify-center ml-2 gap-0.5">
-                    <p className="text-sm font-semibold text-blue-300 leading-tight">
+                  <div className="flex flex-col items-end justify-center ml-2 gap-0.5 flex-shrink-0">
+                    <p className="text-sm font-semibold text-blue-300 leading-tight whitespace-nowrap">
                       {lastGameStats ? `+${lastGameStats.winnerGain} TON` : '+99 TON'}
                     </p>
-                    <p className="text-xs text-muted-foreground leading-tight">
+                    <p className="text-xs text-muted-foreground leading-tight whitespace-nowrap">
                       {lastGameStats ? `CHANCE ${Math.round(lastGameStats.winnerChance)}%` : 'CHANCE 81%'}
                     </p>
                   </div>
@@ -358,24 +358,24 @@ export const Lobby: React.FC<LobbyProps> = ({
               {/* Top Game Card */}
               <div className="flex-1 bg-card border border-border rounded-lg p-2">
                 <div className="flex items-center justify-between min-h-[40px]">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="w-5 h-5 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-bold text-xs">
                         {topGameStats?.winner?.shortName?.charAt(0) || 'G'}
                       </span>
                     </div>
-                    <div className="flex flex-col min-w-0 gap-0.5">
+                    <div className="flex flex-col min-w-0 gap-0.5 flex-1">
                       <p className="font-medium text-white text-xs truncate">
                         {topGameStats?.winner ? `@${topGameStats.winner.shortName}...` : '@Ga...'}
                       </p>
-                      <p className="text-xs text-muted-foreground">TOP GAME</p>
+                      <p className="text-xs text-muted-foreground truncate">TOP GAME</p>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end justify-center ml-2 gap-0.5">
-                    <p className="text-sm font-semibold text-yellow-400 leading-tight">
+                  <div className="flex flex-col items-end justify-center ml-2 gap-0.5 flex-shrink-0">
+                    <p className="text-sm font-semibold text-yellow-400 leading-tight whitespace-nowrap">
                       {topGameStats ? `+${topGameStats.winnerGain} TON` : '+36188 TON'}
                     </p>
-                    <p className="text-xs text-muted-foreground leading-tight">
+                    <p className="text-xs text-muted-foreground leading-tight whitespace-nowrap">
                       {topGameStats ? `CHANCE ${Math.round(topGameStats.winnerChance)}%` : 'CHANCE 48%'}
                     </p>
                   </div>
@@ -801,7 +801,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           onClick={() => setIsModalOpen(true)}
           variant="ton"
           size="lg"
-          className="flex-1 h-12 text-base"
+          className="flex-1 h-14 text-base"
         >
           + Add Gifts
         </Button>
