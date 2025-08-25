@@ -8,6 +8,7 @@ Dans votre dashboard Vercel, configurez automatiquement :
 
 ```bash
 # Variables d'environnement à ajouter
+
 VITE_TELEGRAM_BOT_TOKEN=7516841125:AAH_jkU6wLOEoApkwu8afeXbZr58bBqiIrU
 VITE_API_BASE_URL=https://gift-tournament-backend.railway.app
 VITE_DEV_MODE=false
