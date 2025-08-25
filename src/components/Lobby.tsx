@@ -319,12 +319,12 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background p-3">
       {/* Telegram User Info */}
       <TelegramUserInfo user={user || null} isTelegram={isTelegram} />
       
       {/* Test Panel Toggle Only */}
-       <div className="bg-card border border-border rounded-lg p-4 mb-6">
+       <div className="bg-card border border-border rounded-lg p-3 mb-3">
          <div className="flex items-center justify-end">
            <Button
              variant="outline"
@@ -338,10 +338,10 @@ export const Lobby: React.FC<LobbyProps> = ({
        </div>
 
                   {/* Last Game & Top Game Cards */}
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-2">
               {/* Last Game Card */}
-              <div className="flex-1 bg-card border border-border rounded-lg p-2.5">
-                <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex-1 bg-card border border-border rounded-lg p-2">
+                <div className="flex items-center justify-between min-h-[40px]">
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-bold text-xs">
@@ -367,8 +367,8 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
 
               {/* Top Game Card */}
-              <div className="flex-1 bg-card border border-border rounded-lg p-2.5">
-                <div className="flex items-center justify-between min-h-[48px]">
+              <div className="flex-1 bg-card border border-border rounded-lg p-2">
+                <div className="flex items-center justify-between min-h-[40px]">
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 bg-gradient-to-br from-green-600 to-green-800 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-bold text-xs">
@@ -395,7 +395,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
 
       {/* Game Status Bar */}
-      <div className="bg-card border border-border rounded-lg p-3 mb-4">
+      <div className="bg-card border border-border rounded-lg p-2 mb-3">
         <div className="flex items-center justify-between">
           {/* History Button */}
           <div 
@@ -433,14 +433,14 @@ export const Lobby: React.FC<LobbyProps> = ({
       </div>
 
              {/* Battle Royale Arena - No Title, No Border */}
-       <div className="mb-6">
+       <div className="mb-4">
 
          
-         {/* Circle Arena - Almost Full Width */}
-          <div className="relative w-full max-w-6xl mx-auto">
+                   {/* Circle Arena - Almost Full Width */}
+          <div className="relative w-full max-w-4xl mx-auto">
                          {/* Arena Circle */}
                           <div className={`
-                w-96 h-96 sm:w-[32rem] sm:h-[32rem] lg:w-[40rem] lg:h-[40rem] xl:w-[48rem] xl:h-[48rem] mx-auto border-2 border-dashed border-muted-foreground/30 rounded-full 
+                w-80 h-80 sm:w-96 sm:h-96 lg:w-[28rem] lg:h-[28rem] xl:w-[32rem] xl:h-[32rem] mx-auto border-2 border-dashed border-muted-foreground/30 rounded-full 
                 flex items-center justify-center transition-all duration-1000
                 ${tournamentPhase === 'running' ? 'animate-pulse border-red-400' : ''}
                 ${tournamentPhase === 'finished' ? 'border-green-400 scale-90' : ''}
@@ -807,12 +807,12 @@ export const Lobby: React.FC<LobbyProps> = ({
        </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-3 mb-4">
         <Button 
           onClick={() => setIsModalOpen(true)}
           variant="ton"
           size="lg"
-          className="flex-1 h-14 text-base"
+          className="flex-1 h-12 text-base"
         >
           + Add Gifts
         </Button>
@@ -1249,7 +1249,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         )}
         
         {/* Bottom Navigation Menu */}
-        <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 z-50">
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-3 z-50">
           <div className="flex items-center justify-around max-w-md mx-auto">
             {/* PvP - Current Page */}
             <div 
