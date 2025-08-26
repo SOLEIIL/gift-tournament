@@ -261,23 +261,34 @@ class TelegramGiftDetector {
   // 🔍 Détecter si c'est un withdraw en analysant le message Telegram
   isWithdrawByMessage(message) {
     try {
+      console.log(`🔍 ANALYSE MESSAGE: "${message.message || 'Aucun texte'}"`);
+      
       // Analyser le message pour détecter le type d'événement
       if (message.message) {
         const messageText = message.message.toLowerCase();
+        console.log(`🔍 Message en minuscules: "${messageText}"`);
         
         // Gift ENVOYÉ : "You transferer a unique collectible" → WITHDRAW
         if (messageText.includes('you transferer') || messageText.includes('you transferred')) {
+          console.log(`🔍 DÉTECTÉ: WITHDRAW (contient "you transferer/transferred")`);
           return true;
         }
         
         // Gift REÇU : "(username) transfered a unique collectible to you" → DÉPÔT
         if (messageText.includes('transfered to you') || messageText.includes('transferred to you')) {
+          console.log(`🔍 DÉTECTÉ: DÉPÔT (contient "transfered/transferred to you")`);
           return false;
         }
+        
+        console.log(`🔍 Aucun pattern détecté, fallback sur message.out`);
+      } else {
+        console.log(`🔍 Pas de message texte, fallback sur message.out`);
       }
       
       // Fallback : utiliser message.out si le message n'est pas lisible
-      return message.out === true;
+      const fallbackResult = message.out === true;
+      console.log(`🔍 Fallback message.out (${message.out}) = ${fallbackResult}`);
+      return fallbackResult;
       
     } catch (error) {
       console.error('❌ Erreur lors de la détection du withdraw par message:', error.message);
@@ -319,12 +330,25 @@ class TelegramGiftDetector {
       
 
       
+      // 🔍 LOGS DÉTAILLÉS POUR DIAGNOSTIQUER
+      console.log('\n🔍 === ANALYSE DÉTAILLÉE DU MESSAGE ===');
+      console.log(`📱 Message ID: ${message.id}`);
+      console.log(`📝 Message texte: "${message.message || 'Aucun texte'}"`);
+      console.log(`📤 Message.out: ${message.out}`);
+      console.log(`🏷️  Message class: ${message.className}`);
+      console.log(`👤 Expéditeur ID: ${fromUserId}`);
+      console.log(`👤 Expéditeur username: ${this.extractSenderUsername(message)}`);
+      console.log(`🎁 Gift: ${giftInfo.giftName} (${giftInfo.giftValue}⭐)`);
+      console.log(`⏰ Timestamp: ${new Date(message.date * 1000).toISOString()}`);
+      
       // 🎯 LOGIQUE CORRIGÉE BASÉE SUR LES MESSAGES TELEGRAM :
       // - Gift REÇU : "(username) transfered a unique collectible to you" → DÉPÔT
       // - Gift ENVOYÉ : "You transferer a unique collectible" → WITHDRAW
       
       // Déterminer le type d'événement en analysant le message
       const isWithdraw = this.isWithdrawByMessage(message);
+      console.log(`🔍 Détection withdraw: ${isWithdraw}`);
+      console.log('==========================================\n');
       
       if (isWithdraw) {
         console.log(`⚠️  Withdraw détecté (ignoré pour l'instant): ${giftInfo.giftName}`);
