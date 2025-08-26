@@ -50,9 +50,12 @@ class GiftSyncSystem {
       await this.giftDetector.start();
       console.log('✅ Détecteur de gifts démarré avec succès !\n');
 
-      // Démarrer le bot d'inventaire
+      // Démarrer le bot d'inventaire avec l'inventaire partagé
       console.log('🤖 DÉMARRAGE DU BOT D\'INVENTAIRE...');
-      this.inventoryBot = new TelegramInventoryBot(SYSTEM_CONFIG);
+      this.inventoryBot = new TelegramInventoryBot(
+        SYSTEM_CONFIG, 
+        this.giftDetector.virtualInventory
+      );
       await this.inventoryBot.start();
       console.log('✅ Bot d\'inventaire démarré avec succès !\n');
 

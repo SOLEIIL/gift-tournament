@@ -1,11 +1,34 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 30
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
+  ],
+  "routes": [
+    {
+      "src": "/api/inventory-webhook",
+      "dest": "/api/inventory-webhook.js"
+    },
+    {
+      "src": "/api/telegram-webhook",
+      "dest": "/api/telegram-webhook.js"
+    },
+    {
+      "src": "/api/gift-status",
+      "dest": "/api/gift-status.js"
+    },
+    {
+      "src": "/api/inventory-status",
+      "dest": "/api/inventory-status.js"
+    },
+    {
+      "src": "/api/user-inventory",
+      "dest": "/api/user-inventory.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
   }
 }

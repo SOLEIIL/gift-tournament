@@ -1,8 +1,9 @@
-// services/telegramGiftDetector-fixed.cjs
-// Version corrigée qui utilise la même approche de connexion que le test
+// services/telegramGiftDetector.cjs
+// Basé sur TG Gifts Notifier (https://github.com/arynyklas/tg_gifts_notifier)
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const crypto = require('crypto');
+const VirtualInventoryManager = require('./virtualInventoryManager.cjs');
 require('dotenv').config();
 
 class TelegramGiftDetector {
@@ -14,26 +15,20 @@ class TelegramGiftDetector {
     
     // Configuration du compte de dépôt
     this.depositAccountUsername = config.depositAccountUsername;
-    this.wxyzCryptoId = '446713824'; // ID fixe de @WxyzCrypto
     
     // Configuration webhook
     this.webhookUrl = config.webhookUrl;
     this.webhookSecret = config.webhookSecret;
     this.apiKey = config.apiKey;
     
-    // Token de bypass Vercel pour l'API
-    this.vercelBypassToken = 'J7ycuRhEZVd72UKna9XRx64n2eQ2Cz27';
-    
     // État du service
     this.isRunning = false;
     this.client = null;
     this.pollingInterval = null;
-    this.lastMessageIds = new Map();
+    this.lastMessageIds = new Map(); // Stocker le dernier ID de message par chat
     
-    // 🔒 SYSTÈME DE DÉDUPLICATION DES GIFTS
-    this.processedGifts = new Map(); // Map pour éviter les doublons
-    this.giftDeduplicationKey = (giftName, collectibleId, fromUserId) => 
-      `${giftName}-${collectibleId}-${fromUserId}`;
+    // 🎯 Gestionnaire d'inventaire virtuel
+    this.virtualInventory = new VirtualInventoryManager();
     
     // Validation de la configuration
     this.validateConfig();
@@ -45,36 +40,37 @@ class TelegramGiftDetector {
       console.log('🎁 Démarrage du détecteur de VRAIS gifts Telegram...');
       console.log('==================================================');
       
-      // Créer le client Telegram avec la même config que le test
+      // Créer le client Telegram
       this.client = new TelegramClient(
         new StringSession(this.telegramSessionString),
         this.telegramApiId,
         this.telegramApiHash,
-        { 
-          connectionRetries: 3,
-          useWSS: false
-        }
+        { connectionRetries: 5 }
       );
       
-      // Connexion directe (comme dans le test qui fonctionne)
+      // Connexion au client
+      await this.client.start();
+      
+      // Récupération des informations du compte
+      const me = await this.client.getMe();
+      console.log(`🎁 Configuration Telegram Gift Detector:`);
+      console.log(`   API_ID: ${this.telegramApiId}`);
+      console.log(`   API_HASH: ${this.telegramApiHash.substring(0, 20)}...`);
+      console.log(`   SESSION: ${this.telegramSessionString.substring(0, 20)}...`);
+      console.log(`   COMPTE: ${me.username || me.firstName}`);
+      
       console.log('🚀 Démarrage du détecteur de gifts Telegram...');
       await this.client.connect();
       
-      // Vérifier l'autorisation
       if (await this.client.isUserAuthorized()) {
-        // Récupération des informations du compte
-        const me = await this.client.getMe();
-        console.log(`🎁 Configuration Telegram Gift Detector:`);
-        console.log(`   API_ID: ${this.telegramApiId}`);
-        console.log(`   API_HASH: ${this.telegramApiHash.substring(0, 20)}...`);
-        console.log(`   SESSION: ${this.telegramSessionString.substring(0, 20)}...`);
-        console.log(`   COMPTE: ${me.username || me.firstName}`);
-        
         console.log(`✅ Connecté en tant que: @${me.username || 'Unknown'} (${me.firstName || 'Unknown'})`);
         
         // 🔍 SCANNER L'HISTOIRE DES GIFTS REÇUS
         console.log('🔍 Scanner l\'historique des gifts reçus...');
         await this.scanHistory();
+        
+        // 🎯 AFFICHER L'INVENTAIRE VIRTUEL ACTUEL
+        this.virtualInventory.displayAllInventories();
         
         // Démarrer la surveillance par polling
         console.log('📨 Démarrage de la surveillance des gifts par polling...');
@@ -117,20 +113,17 @@ class TelegramGiftDetector {
       const dialogs = await this.client.getDialogs();
       let giftsFound = 0;
       let nativeGiftsFound = 0;
-      let processedGifts = new Set(); // Pour éviter les doublons dans l'historique
+      let giftsFilteredOut = 0;
       
       console.log('🔍 Recherche des VRAIS gifts Telegram dans l\'historique...');
       
       for (const dialog of dialogs) {
         if (dialog.entity && dialog.entity.className === 'User') {
           const chatId = dialog.entity.id.toString();
-          const username = dialog.entity.username || dialog.entity.firstName || 'Unknown';
+          console.log(`📱 Vérification du chat avec: ${dialog.entity.username || dialog.entity.firstName || 'Unknown'}`);
           
           try {
-            // 🚨 SCAN AGRESSIF : Vérifier 200 messages au lieu de 50
-            const messages = await this.client.getMessages(dialog.entity, { limit: 200 });
-            
-            console.log(`🔍 Scan du chat @${username}: ${messages.length} messages analysés`);
+            const messages = await this.client.getMessages(dialog.entity, { limit: 50 });
             
             // Initialiser le dernier ID de message pour ce chat
             if (messages.length > 0) {
@@ -140,95 +133,70 @@ class TelegramGiftDetector {
             for (const message of messages) {
               // 🎯 UNIQUEMENT : Détecter les vrais gifts Telegram
               if (this.isRealTelegramGift(message)) {
-                // Extraire les infos du gift pour la déduplication
-                const giftInfo = this.extractGiftInfo(message);
-                if (giftInfo) {
-                  const dedupKey = this.giftDeduplicationKey(giftInfo.giftName, giftInfo.collectibleId, this.extractSenderId(message));
-                  
-                  // Traiter seulement si pas déjà vu
-                  if (!processedGifts.has(dedupKey)) {
-                    processedGifts.add(dedupKey);
-                    nativeGiftsFound++;
-                    
-                    console.log(`🎁 Gift historique: ${giftInfo.giftName} de @${username}`);
-                    
-                    // Traiter le gift
-                    const success = await this.processGiftMessage(message, true);
-                    if (!success) {
-                      console.log('⚠️  Gift non traité (erreur)');
-                    }
+                console.log('🎁 VRAI GIFT TELEGRAM DÉTECTÉ dans l\'historique !');
+                
+                // 🔍 ENRICHIR LE MESSAGE AVEC LES INFOS DU DIALOGUE
+                const enrichedMessage = {
+                  ...message,
+                  chat: {
+                    id: { value: dialog.entity.id },
+                    username: dialog.entity.username,
+                    title: dialog.entity.firstName || dialog.entity.username
                   }
+                };
+                
+                // Traiter le gift enrichi
+                const success = await this.processGiftMessage(enrichedMessage, true);
+                
+                nativeGiftsFound++;
+                
+                if (success === 'filtered') {
+                  giftsFilteredOut++;
+                } else if (success === true) {
+                  giftsFound++;
+                } else {
+                  console.error('❌ ÉCHEC du traitement du gift, arrêt du scan');
+                  return; // S'arrêter immédiatement
                 }
               }
             }
-          } catch (error) {
-            console.log(`⚠️  Erreur lors de la vérification du chat: ${error.message}`);
+          } catch (chatError) {
+            console.warn(`⚠️ Erreur lors de la vérification du chat ${dialog.entity.username || 'Unknown'}:`, chatError.message);
+            continue;
           }
         }
       }
       
-      console.log(`✅ Scan terminé: ${nativeGiftsFound} gifts uniques trouvés`);
+      if (nativeGiftsFound === 0) {
+        console.log('❌ AUCUN VRAI GIFT TELEGRAM trouvé dans l\'historique');
+        console.log('🛑 ARRÊT du scan - pas de gifts natifs détectés');
+        return;
+      }
       
-      // 🚨 SCAN SPÉCIAL : Vérifier le compte @WxyzCrypto lui-même
-      console.log('🔍 SCAN SPÉCIAL : Vérification du compte @WxyzCrypto...');
-      await this.scanWxyzCryptoAccount();
+      console.log(`✅ Scan terminé: ${nativeGiftsFound} vrais gifts Telegram trouvés`);
+      console.log(`📊 Résultats: ${giftsFound} gifts ajoutés, ${giftsFilteredOut} gifts filtrés (retirés)`);
       
     } catch (error) {
       console.error('❌ Erreur lors du scan de l\'historique:', error.message);
-    }
-  }
-
-  // 🚨 SCAN SPÉCIAL : Vérifier le compte @WxyzCrypto pour les gifts non détectés
-  async scanWxyzCryptoAccount() {
-    try {
-      console.log('🔍 Scan du compte @WxyzCrypto pour les gifts...');
-      
-      // Récupérer les messages du compte @WxyzCrypto
-      const me = await this.client.getMe();
-      const messages = await this.client.getMessages(me, { limit: 100 });
-      
-      console.log(`🔍 ${messages.length} messages analysés sur le compte @WxyzCrypto`);
-      
-      let giftsFound = 0;
-      for (const message of messages) {
-        if (this.isRealTelegramGift(message)) {
-          const giftInfo = this.extractGiftInfo(message);
-          if (giftInfo) {
-            giftsFound++;
-            console.log(`🎁 GIFT TROUVÉ sur @WxyzCrypto: ${giftInfo.giftName} #${giftInfo.collectibleId}`);
-            
-            // Traiter le gift comme un dépôt
-            const success = await this.processGiftMessage(message, true);
-            if (success) {
-              console.log(`✅ Gift traité avec succès: ${giftInfo.giftName}`);
-            }
-          }
-        }
-      }
-      
-      console.log(`✅ Scan @WxyzCrypto terminé: ${giftsFound} gifts trouvés`);
-      
-    } catch (error) {
-      console.error('❌ Erreur lors du scan @WxyzCrypto:', error.message);
+      console.log('🛑 ARRÊT du scan en raison d\'une erreur');
     }
   }
 
   // Démarrer la surveillance par polling
   async startPolling() {
-    try {
-      console.log('📨 Démarrage de la surveillance des gifts par polling...');
+    console.log('🔍 Démarrage de la surveillance par polling (toutes les 5 secondes)...');
+    
+    // Première vérification immédiate
+    await this.checkForNewMessages();
+    
+    // Vérification toutes les 5 secondes
+    this.pollingInterval = setInterval(async () => {
+      await this.checkForNewMessages();
       
-      // Vérifier les nouveaux messages toutes les 5 secondes
-      this.pollingInterval = setInterval(async () => {
-        await this.checkForNewMessages();
-      }, 5000);
-      
-      console.log('🔍 Démarrage de la surveillance par polling (toutes les 5 secondes)...');
-      console.log('✅ Polling configuré avec succès');
-      
-    } catch (error) {
-      console.error('❌ Erreur lors du démarrage du polling:', error.message);
-    }
+
+    }, 5000);
+    
+    console.log('✅ Polling configuré avec succès');
   }
 
   // Vérifier les nouveaux messages
@@ -239,344 +207,368 @@ class TelegramGiftDetector {
       for (const dialog of dialogs) {
         if (dialog.entity && dialog.entity.className === 'User') {
           const chatId = dialog.entity.id.toString();
-          const lastKnownId = this.lastMessageIds.get(chatId) || 0;
+          const chatName = dialog.entity.username || dialog.entity.firstName || 'Unknown';
           
           try {
-            const messages = await this.client.getMessages(dialog.entity, { 
-              limit: 10,
-              offsetId: lastKnownId 
-            });
+            // Obtenir les messages récents
+            const messages = await this.client.getMessages(dialog.entity, { limit: 10 });
             
+            if (messages.length === 0) continue;
+            
+            // Obtenir le dernier ID connu pour ce chat
+            const lastKnownId = this.lastMessageIds.get(chatId) || 0;
+            
+            // Vérifier s'il y a de nouveaux messages
             for (const message of messages) {
               if (message.id > lastKnownId) {
-                console.log(`📨 Nouveau message ${message.id} de ${dialog.entity.username || dialog.entity.firstName}`);
+                console.log(`📨 Nouveau message ${message.id} de ${chatName}`);
                 
-                // Détecter les gifts
+                // 🎯 VÉRIFIER SI C'EST UN GIFT TELEGRAM
                 if (this.isRealTelegramGift(message)) {
                   console.log('🎁🎁🎁 NOUVEAU GIFT TELEGRAM DÉTECTÉ ! 🎁🎁🎁');
                   
+                  // 🔍 ENRICHIR LE MESSAGE AVEC LES INFOS DU DIALOGUE
+                  const enrichedMessage = {
+                    ...message,
+                    chat: {
+                      id: { value: dialog.entity.id },
+                      username: dialog.entity.username,
+                      title: dialog.entity.firstName || dialog.entity.username
+                    }
+                  };
+                  
                   if (message.out) {
+                    // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
                     console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
+                    await this.processWithdrawMessage(enrichedMessage);
                   } else {
+                    // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
                     console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
-                    await this.processGiftMessage(message, false);
+                    await this.processGiftMessage(enrichedMessage, false);
                   }
                 }
                 
-                // Mettre à jour le dernier ID connu
+                // Mettre à jour le dernier ID
                 this.lastMessageIds.set(chatId, Math.max(message.id, lastKnownId));
               }
             }
-          } catch (error) {
-            console.log(`⚠️  Erreur lors de la vérification des nouveaux messages: ${error.message}`);
+            
+          } catch (chatError) {
+            console.warn(`⚠️ Erreur lors de la vérification du chat ${chatName}:`, chatError.message);
+            continue;
           }
         }
       }
+      
     } catch (error) {
       console.error('❌ Erreur lors de la vérification des nouveaux messages:', error.message);
     }
   }
 
-  // Vérifier si c'est un vrai gift Telegram
+  // Vérifier si un message contient un vrai gift Telegram
   isRealTelegramGift(message) {
     try {
-      // Vérifier si c'est un MessageService avec MessageActionStarGiftUnique
-      if (message.className === 'MessageService' && message.action) {
-        if (message.action.className === 'MessageActionStarGiftUnique') {
+      // 🎯 UNIQUEMENT : DÉTECTION DES GIFTS NATIFS TELEGRAM (MessageActionStarGiftUnique)
+      if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
+        // 🔍 DÉTECTION DES GIFTS REÇUS ET ENVOYÉS (WITHDRAWS)
+        if (message.out) {
+          console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
+          return true; // Maintenant on détecte les withdraws
+        } else {
+          console.log('🎁 VRAI GIFT TELEGRAM DÉTECTÉ ! (MessageActionStarGiftUnique) - REÇU');
           return true;
         }
       }
-      
-      // Vérifier si c'est un Message avec action
-      if (message.className === 'Message' && message.action) {
-        if (message.action.className === 'MessageActionStarGiftUnique') {
-          return true;
-        }
-      }
-      
+
+      // 🚫 TOUT LE RESTE EST IGNORÉ
       return false;
+
     } catch (error) {
       console.error('❌ Erreur lors de la vérification du gift:', error.message);
       return false;
     }
   }
 
-  // 🔍 Extraire le destinataire depuis la conversation (pour les withdraws)
-  extractRecipientFromConversation(message) {
+
+
+  // Traiter un message de withdraw (gift envoyé par @WxyzCrypto)
+  async processWithdrawMessage(message) {
     try {
-      console.log(`🔍 EXTRACTION DESTINATAIRE - Message structure:`, {
-        peerId: message.peerId,
-        chat: message.chat,
-        fromId: message.fromId,
-        toId: message.toId
-      });
+      console.log('🚫 Traitement du WITHDRAW...');
       
-      // 🎯 NOUVELLE SOLUTION : Utiliser message.chat pour récupérer username et ID
-      if (message.chat && message.chat.className === 'User') {
-        console.log(`🔍 Chat utilisateur trouvé:`, message.chat);
-        
-        // Extraire l'ID (sans le 'n' à la fin)
-        const userId = message.chat.id.value.toString();
-        const username = message.chat.username;
-        
-        console.log(`🔍 ID utilisateur extrait: ${userId}`);
-        console.log(`🔍 Username extrait: @${username}`);
-        
-        // Retourner le username si disponible, sinon l'ID
-        if (username) {
-          return username;
-        } else {
-          return userId;
-        }
+      // 🔍 Extraction des informations du gift envoyé
+      const giftInfo = this.extractGiftInfo(message);
+      
+      if (!giftInfo) {
+        console.error('❌ ÉCHEC de l\'extraction des métadonnées du withdraw');
+        return false;
       }
       
-      // Fallback : utiliser peerId si chat n'est pas disponible
-      if (message.peerId) {
-        console.log(`🔍 Fallback peerId:`, message.peerId);
-        
-        if (message.peerId.className === 'PeerUser') {
-          const userId = message.peerId.userId.toString();
-          console.log(`🔍 Fallback ID utilisateur: ${userId}`);
-          return userId;
-        }
-      }
+      console.log('✅ Métadonnées du withdraw extraites avec succès');
       
-      console.log(`🔍 Aucun destinataire trouvé`);
-      return 'unknown_recipient';
+      // Générer un ID unique pour le withdraw
+      const withdrawId = `withdraw_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Préparer les données du withdraw
+      const withdrawData = {
+        id: withdrawId,
+        fromDepositAccount: this.depositAccountUsername,
+        toUserId: giftInfo.toUserId || 'unknown',
+        toUsername: giftInfo.toUsername || 'unknown',
+        giftId: message.id.toString(),
+        giftName: giftInfo.giftName,
+        giftValue: giftInfo.giftValue,
+        giftType: giftInfo.giftType,
+        mediaType: giftInfo.mediaType,
+        collectibleId: giftInfo.collectibleId,
+        collectibleModel: giftInfo.collectibleModel,
+        collectibleBackdrop: giftInfo.collectibleBackdrop,
+        collectibleSymbol: giftInfo.collectibleSymbol,
+        timestamp: new Date().toISOString(),
+        status: 'withdrawn',
+        telegramMessageId: message.id,
+        messageText: message.message || '',
+        isWithdraw: true
+      };
+      
+      console.log('📋 Informations du WITHDRAW:', withdrawData);
+      
+      // 🎯 RETIRER DE L'INVENTAIRE VIRTUEL
+      this.virtualInventory.removeGiftWithdrawn(withdrawData);
+      
+      // Envoyer le webhook pour le withdraw
+      await this.sendWebhook('gift_withdrawn', withdrawData);
+      
+      console.log('✅ WITHDRAW traité avec succès !');
+      return true;
       
     } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du destinataire:', error.message);
-      return 'error_recipient';
+      console.error('❌ Erreur lors du traitement du withdraw:', error.message);
+      return false;
     }
   }
-
-  // 🔍 Extraire l'ID Telegram du destinataire (pour les withdraws)
-  extractRecipientUserId(message) {
-    try {
-      // 🎯 PRIORITÉ 1: message.chat.id.value (pour les WITHDRAWS)
-      if (message.chat && message.chat.className === 'User') {
-        const userId = message.chat.id.value.toString();
-        console.log(`🔍 ID Telegram du destinataire extrait: ${userId}`);
-        return userId;
-      }
-      
-      // 🎯 PRIORITÉ 2: message.peerId.userId (fallback)
-      if (message.peerId && message.peerId.className === 'PeerUser') {
-        const userId = message.peerId.userId.toString();
-        console.log(`🔍 Fallback ID Telegram du destinataire: ${userId}`);
-        return userId;
-      }
-      
-      console.log(`🔍 Aucun ID Telegram du destinataire trouvé`);
-      return 'unknown_user_id';
-      
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction de l\'ID Telegram du destinataire:', error.message);
-      return 'error_user_id';
-    }
-  }
-
-
-
-
 
   // Traiter un message de gift
   async processGiftMessage(message, isFromHistory = false) {
     try {
-      // Extraire les informations du gift
+      console.log('🎁 Traitement du gift...');
+      
+      // 🔍 Extraction des informations du gift
       const giftInfo = this.extractGiftInfo(message);
+      
+      // 🛑 ARRÊT IMMÉDIAT si l'extraction échoue
       if (!giftInfo) {
+        console.error('❌ ÉCHEC de l\'extraction des métadonnées du gift');
         return false;
       }
       
-      // 🔒 VÉRIFICATION DE DÉDUPLICATION
-      const fromUserId = this.extractSenderId(message);
-      const dedupKey = this.giftDeduplicationKey(giftInfo.giftName, giftInfo.collectibleId, fromUserId);
+      // 🔍 VÉRIFIER SI LE GIFT EST ENCORE SUR LE COMPTE @WxyzCrypto
+      const isGiftStillOnAccount = await this.verifyGiftOnAccount(message);
       
-      // Vérifier si ce gift a déjà été traité récemment
-      if (this.processedGifts.has(dedupKey)) {
-        const lastProcessed = this.processedGifts.get(dedupKey);
-        const timeDiff = Date.now() - lastProcessed.timestamp;
-        
-        // Si le gift a été traité il y a moins de 5 minutes, l'ignorer silencieusement
-        if (timeDiff < 5 * 60 * 1000) {
-          return false;
-        }
-        
-        // Si c'est le même message, l'ignorer complètement
-        if (lastProcessed.messageId === message.id) {
-          return false;
-        }
+      if (!isGiftStillOnAccount) {
+        console.log('🚫 Gift retiré - pas d\'ajout à l\'inventaire virtuel');
+        return 'filtered'; // Gift traité mais filtré (retiré)
       }
       
-
+      console.log('✅ Gift confirmé sur le compte @WxyzCrypto - ajout à l\'inventaire');
       
-      // 🎯 LOGS ESSENTIELS SEULEMENT
-      console.log(`\n🎁 === GIFT DÉTECTÉ ===`);
-      console.log(`📱 ID: ${message.id}`);
-      console.log(`👤 Expéditeur: ${this.extractSenderUsername(message)} (ID: ${fromUserId})`);
-      console.log(`🎁 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId} (${giftInfo.giftValue}⭐)`);
-      console.log(`🏷️  Traits: ${giftInfo.collectibleModel} | ${giftInfo.collectibleBackdrop} | ${giftInfo.collectibleSymbol}`);
+      // Générer un ID unique pour le transfert
+      const transferId = `transfer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // 🎯 DÉTECTION AMÉLIORÉE AVEC L'ID @WxyzCrypto :
-      // - Expéditeur ID = 446713824 → WITHDRAW (envoyé par @WxyzCrypto)
-      // - Expéditeur ID ≠ 446713824 → DÉPÔT (reçu par @WxyzCrypto)
-      
-      const isWithdraw = fromUserId === this.wxyzCryptoId;
-      
-      // 🏦 LOGIQUE DE BANQUE : @WxyzCrypto est la banque du jeu
-      // - DÉPÔT : Gift reste sur @WxyzCrypto mais est crédité visuellement à l'utilisateur
-      // - WITHDRAW : Gift reste sur @WxyzCrypto mais est débité visuellement de l'utilisateur
-      if (isWithdraw) {
-        console.log(`🏦 WITHDRAW DÉTECTÉ - Débit visuel de l'inventaire utilisateur`);
-        console.log(`🔍 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId}`);
-      } else {
-        console.log(`🏦 DÉPÔT DÉTECTÉ - Crédit visuel de l'inventaire utilisateur`);
-        console.log(`🔍 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId}`);
-      }
-      
-      console.log(`🔍 ID @WxyzCrypto: ${this.wxyzCryptoId}`);
-      console.log(`🔍 ID Expéditeur: ${fromUserId}`);
-      console.log(`🔄 Type: ${isWithdraw ? 'WITHDRAW' : 'DÉPÔT'}`);
-      console.log('========================\n');
-      
-      if (isWithdraw) {
-        // WITHDRAW : @WxyzCrypto envoie un gift → RETIRER de l'inventaire
-        console.log(`🔄 WITHDRAW détecté: ${giftInfo.giftName} envoyé par @WxyzCrypto`);
-        
-        // Récupérer le destinataire depuis la conversation
-        const recipientUsername = this.extractRecipientFromConversation(message);
-        console.log(`👤 Destinataire détecté: @${recipientUsername}`);
-        
-        // 🎯 IMPORTANT : Pour un WITHDRAW, nous devons retirer le gift de l'inventaire
-        // Nous avons besoin de l'ID Telegram de l'utilisateur pour l'inventaire
-        const recipientUserId = this.extractRecipientUserId(message);
-        console.log(`👤 ID Telegram du destinataire: ${recipientUserId}`);
-        
-        const eventType = 'gift_withdrawn';
-        const eventData = {
-          toUsername: recipientUsername,
-          toUserId: recipientUserId,
-          fromDepositAccount: this.depositAccountUsername,
-          ...giftInfo,
-          isFromHistory: isFromHistory
-        };
-        
-        // Envoyer le webhook
-        await this.sendWebhook(eventType, eventData);
-        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${recipientUsername} (ID: ${recipientUserId})`);
-        
-        return true;
-      }
-      
-      // DÉPÔT : @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire
-      const eventType = 'transfer_received';
-      const eventData = {
-        fromUserId: fromUserId,
-        fromUsername: this.extractSenderUsername(message),
-        fromFirstName: this.extractSenderFirstName(message),
-        fromLastName: this.extractSenderLastName(message),
+      // Préparer les données du transfert
+      const transferData = {
+        id: transferId,
+        fromUserId: giftInfo.fromUserId,
+        fromUsername: giftInfo.fromUsername,
         toDepositAccount: this.depositAccountUsername,
-        ...giftInfo,
+        giftId: message.id.toString(),
+        giftName: giftInfo.giftName,
+        giftValue: giftInfo.giftValue,
+        giftType: giftInfo.giftType,
+        mediaType: giftInfo.mediaType,
+        collectibleId: giftInfo.collectibleId,
+        collectibleModel: giftInfo.collectibleModel,
+        collectibleBackdrop: giftInfo.collectibleBackdrop,
+        collectibleSymbol: giftInfo.collectibleSymbol,
+        timestamp: new Date().toISOString(),
+        status: 'active',
+        telegramMessageId: message.id,
+        messageText: message.message || '',
         isFromHistory: isFromHistory
       };
-      
-      // 🔒 MARQUER CE GIFT COMME TRAITÉ
-      this.processedGifts.set(dedupKey, {
-        timestamp: Date.now(),
-        messageId: message.id,
-        eventType: eventType,
-        giftName: giftInfo.giftName
-      });
-      
-      // Nettoyer les anciens gifts (garder seulement les 1000 plus récents)
-      if (this.processedGifts.size > 1000) {
-        const entries = Array.from(this.processedGifts.entries());
-        entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
-        this.processedGifts = new Map(entries.slice(0, 1000));
-      }
-      
+
+      // 🎯 AJOUTER À L'INVENTAIRE VIRTUEL
+      this.virtualInventory.addGiftReceived(transferData);
+
       // Envoyer le webhook
-      await this.sendWebhook(eventType, eventData);
-      
-      // Afficher seulement le résumé de l'action
-      const action = eventType === 'transfer_received' ? 'AJOUTÉ' : 'RETIRÉ';
-      const username = eventType === 'transfer_received' ? eventData.fromUsername : eventData.toUsername;
-      console.log(`✅ ${action} à l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${username}`);
-      
+      try {
+        const response = await this.sendWebhook('transfer_received', transferData);
+        if (!response.ok) {
+          console.error(`❌ Erreur webhook: ${response.status}`);
+        }
+      } catch (webhookError) {
+        console.error('❌ Erreur webhook:', webhookError.message);
+      }
+
       return true;
-      
+
     } catch (error) {
       console.error('❌ Erreur lors du traitement du gift:', error.message);
       return false;
     }
   }
 
-  // Extraire les informations du gift (UNIQUEMENT l'essentiel)
+  // Extraire les informations d'un gift Telegram
   extractGiftInfo(message) {
     try {
+      console.log('🔍 Extraction des informations du gift...');
+      
+      // 🎯 PRIORITÉ ABSOLUE : GIFTS NATIFS TELEGRAM (MessageActionStarGiftUnique)
       if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
-        const gift = message.action.gift;
+        console.log('🎁 Extraction des métadonnées du gift natif Telegram...');
         
-        if (gift) {
-          // 🎯 INFORMATIONS ESSENTIELLES SEULEMENT :
-          const giftName = gift.title || 'Unknown Gift';
-          const collectibleId = gift.slug || `gift-${message.id}`;
-          const giftValue = gift.num || 25;
-          
-          // Traitement des attributs (Model, Backdrop, Symbol)
-          const attributes = gift.attributes || [];
-          let collectibleModel = 'Unknown';
-          let collectibleBackdrop = 'Unknown';
-          let collectibleSymbol = 'Unknown';
-          
-          for (const attr of attributes) {
-            if (attr.key === 'model') collectibleModel = attr.value;
-            if (attr.key === 'backdrop') collectibleBackdrop = attr.value;
-            if (attr.key === 'symbol') collectibleSymbol = attr.value;
-          }
-          
-          return {
-            giftName,           // Nom du gift
-            collectibleId,      // ID du collectible
-            giftValue,          // Valeur en stars
-            collectibleModel,   // Model (ex: "Gold Star 1%")
-            collectibleBackdrop, // Backdrop (ex: "Copper 2%")
-            collectibleSymbol   // Symbol (ex: "Genie Lamp 0.4%")
-          };
+        const action = message.action;
+        if (!action.gift) {
+          console.error('❌ Gift object manquant dans MessageActionStarGiftUnique');
+          return null; // S'arrêter immédiatement
         }
+        
+        const gift = action.gift;
+        const giftInfo = {
+          giftName: 'Unknown Gift',
+          giftValue: 25,
+          giftType: 'star_gift_unique',
+          mediaType: 'star_gift_unique',
+          fromUserId: 'unknown',
+          fromUsername: 'unknown',
+          collectibleId: 'unknown',
+          collectibleModel: 'unknown',
+          collectibleBackdrop: 'unknown',
+          collectibleSymbol: 'unknown'
+        };
+
+        // 🆔 Informations de base du gift
+        if (gift.title) {
+          giftInfo.giftName = gift.title;
+        } else {
+          console.error('❌ Titre du gift manquant');
+          return null; // S'arrêter immédiatement
+        }
+
+        if (gift.slug) {
+          giftInfo.collectibleId = gift.slug;
+        } else if (gift.num) {
+          giftInfo.collectibleId = `${gift.title}-${gift.num}`;
+        } else {
+          console.error('❌ Slug et num du collectible manquants');
+          return null; // S'arrêter immédiatement
+        }
+
+        // 💰 Coût en stars
+        if (action.transferStars) {
+          giftInfo.giftValue = parseInt(action.transferStars);
+        }
+
+        // ⭐ Extraction des attributs détaillés
+        if (gift.attributes && gift.attributes.length > 0) {
+          for (const attr of gift.attributes) {
+            if (attr.className === 'StarGiftAttributeModel') {
+              giftInfo.collectibleModel = `${attr.name} (${attr.rarityPermille}‰)`;
+            } else if (attr.className === 'StarGiftAttributePattern') {
+              giftInfo.collectibleSymbol = `${attr.name} (${attr.rarityPermille}‰)`;
+            } else if (attr.className === 'StarGiftAttributeBackdrop') {
+              giftInfo.collectibleBackdrop = `${attr.name} (${attr.rarityPermille}‰)`;
+            }
+          }
+        }
+
+        // 👤 Extraction de l'expéditeur ou du destinataire selon le type de message
+        if (message.out) {
+          // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
+          giftInfo.toUserId = this.extractRecipientId(message);
+          giftInfo.toUsername = this.extractRecipientUsername(message);
+          
+          if (giftInfo.toUserId === 'unknown') {
+            console.warn('⚠️ Impossible d\'extraire l\'ID du destinataire');
+          }
+          if (giftInfo.toUsername === 'unknown') {
+            console.warn('⚠️ Impossible d\'extraire le nom d\'utilisateur du destinataire');
+          }
+        } else {
+          // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
+          giftInfo.fromUserId = this.extractSenderId(message);
+          giftInfo.fromUsername = this.extractSenderUsername(message);
+          
+          if (giftInfo.fromUserId === 'unknown') {
+            console.warn('⚠️ Impossible d\'extraire l\'ID de l\'expéditeur');
+          }
+          if (giftInfo.fromUsername === 'unknown') {
+            console.warn('⚠️ Impossible d\'extraire le nom d\'utilisateur de l\'expéditeur');
+          }
+        }
+
+        console.log('✅ Métadonnées du gift natif extraites avec succès:', giftInfo);
+        return giftInfo;
       }
-      
+
+      // 🚫 Si ce n'est pas un gift natif Telegram, s'arrêter immédiatement
+      console.log('❌ Ce n\'est pas un gift natif Telegram, arrêt de l\'extraction');
       return null;
-      
+
     } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction des informations du gift:', error.message);
-      return null;
+      console.error('❌ Erreur fatale lors de l\'extraction des informations du gift:', error.message);
+      console.error('🛑 Arrêt immédiat de l\'extraction');
+      return null; // S'arrêter immédiatement
     }
   }
 
-  // Extraire l'ID de l'expéditeur
+  // Fonctions d'aide pour extraire les informations de l'expéditeur
   extractSenderId(message) {
     try {
-      // 🎯 PRIORITÉ 1: message.sender.id (pour les WITHDRAWS)
+      // 🔍 PRIORITÉ 1: message.fromId (pour les messages reçus)
+      if (message.fromId) {
+        if (message.fromId.className === 'PeerUser') {
+          console.log('✅ ID expéditeur trouvé via message.fromId:', message.fromId.userId);
+          return message.fromId.userId.toString();
+        }
+      }
+      
+      // 🔍 PRIORITÉ 2: message.action.fromId (pour les actions de gift)
+      if (message.action && message.action.fromId) {
+        if (message.action.fromId.className === 'PeerUser') {
+          console.log('✅ ID expéditeur trouvé via message.action.fromId:', message.action.fromId.userId);
+          return message.action.fromId.userId.toString();
+        }
+      }
+      
+      // 🔍 PRIORITÉ 3: message.sender.id (pour les messages récents)
       if (message.sender && message.sender.id) {
-        console.log(`🔍 Sender ID trouvé: ${message.sender.id}`);
+        console.log('✅ ID expéditeur trouvé via message.sender.id:', message.sender.id);
         return message.sender.id.toString();
       }
       
-      // 🎯 PRIORITÉ 2: message.fromId (pour les DÉPÔTS)
-      if (message.fromId) {
-        console.log(`🔍 FromId trouvé: ${message.fromId}`);
-        return message.fromId.toString();
-      }
-      
-      // 🎯 PRIORITÉ 3: message.peerId.userId (fallback)
+      // 🔍 PRIORITÉ 4: message.peerId.userId (fallback)
       if (message.peerId && message.peerId.userId) {
-        console.log(`🔍 PeerId userId trouvé: ${message.peerId.userId}`);
+        console.log('✅ ID expéditeur trouvé via message.peerId.userId:', message.peerId.userId);
         return message.peerId.userId.toString();
       }
       
-      console.log(`🔍 Aucun ID d'expéditeur trouvé`);
+      // 🔍 PRIORITÉ 5: message.chat.id (pour les conversations privées)
+      if (message.chat && message.chat.id) {
+        // Extraire l'ID de l'utilisateur depuis l'ID du chat
+        const chatId = message.chat.id.value || message.chat.id;
+        if (chatId && typeof chatId === 'bigint') {
+          // Convertir BigInt en string et retirer le 'n' si présent
+          const userId = chatId.toString().replace('n', '');
+          console.log('✅ ID expéditeur trouvé via message.chat.id:', userId);
+          return userId;
+        } else if (chatId) {
+          console.log('✅ ID expéditeur trouvé via message.chat.id:', chatId.toString());
+          return chatId.toString();
+        }
+      }
+      
+      console.warn('⚠️ Aucun ID expéditeur trouvé dans le message');
       return 'unknown';
       
     } catch (error) {
@@ -585,55 +577,118 @@ class TelegramGiftDetector {
     }
   }
 
-  // Extraire le nom d'utilisateur de l'expéditeur
   extractSenderUsername(message) {
     try {
+      // 🔍 PRIORITÉ 1: message.sender.username (pour les messages récents)
       if (message.sender && message.sender.username) {
+        console.log('✅ Username expéditeur trouvé via message.sender.username:', message.sender.username);
         return message.sender.username;
       }
+      
+      // 🔍 PRIORITÉ 2: message.sender.firstName (fallback)
       if (message.sender && message.sender.firstName) {
+        console.log('✅ Prénom expéditeur trouvé via message.sender.firstName:', message.sender.firstName);
         return message.sender.firstName;
       }
+      
+      // 🔍 PRIORITÉ 3: message.action.peer.username
+      if (message.action && message.action.peer && message.action.peer.username) {
+        console.log('✅ Username expéditeur trouvé via message.action.peer.username:', message.action.peer.username);
+        return message.action.peer.username;
+      }
+      
+      // 🔍 PRIORITÉ 4: message.chat.username (depuis l'enrichissement)
+      if (message.chat && message.chat.username) {
+        console.log('✅ Username expéditeur trouvé via message.chat.username:', message.chat.username);
+        return message.chat.username;
+      }
+      
+      console.warn('⚠️ Aucun username expéditeur trouvé dans le message');
       return 'unknown';
+      
     } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du nom d\'utilisateur de l\'expéditeur:', error.message);
+      console.error('❌ Erreur lors de l\'extraction du username expéditeur:', error.message);
       return 'unknown';
     }
   }
 
-  // Extraire le prénom de l'expéditeur
-  extractSenderFirstName(message) {
+  // Extraire l'ID du destinataire (pour les withdraws)
+  extractRecipientId(message) {
     try {
-      if (message.sender && message.sender.firstName) {
-        return message.sender.firstName;
+      if (message.toId) {
+        if (message.toId.className === 'PeerUser') {
+          return message.toId.userId.toString();
+        }
+      }
+      if (message.chat && message.chat.id) {
+        return message.chat.id.toString();
       }
       return 'unknown';
     } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du prénom de l\'expéditeur:', error.message);
+      console.error('❌ Erreur lors de l\'extraction de l\'ID du destinataire:', error.message);
       return 'unknown';
     }
   }
 
-  // Extraire le nom de famille de l'expéditeur
-  extractSenderLastName(message) {
+  // Extraire le nom d'utilisateur du destinataire (pour les withdraws)
+  extractRecipientUsername(message) {
     try {
-      if (message.sender && message.sender.lastName) {
-        return message.sender.lastName;
+      if (message.toId && this.client) {
+        const recipientUser = this.client.getEntity(message.toId);
+        if (recipientUser && recipientUser.username) {
+          return recipientUser.username;
+        }
+        if (recipientUser && recipientUser.firstName) {
+          return recipientUser.firstName;
+        }
+      }
+      if (message.chat && message.chat.username) {
+        return message.chat.username;
+      }
+      if (message.chat && message.chat.title) {
+        return message.chat.title;
       }
       return 'unknown';
     } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du nom de famille de l\'expéditeur:', error.message);
+      console.error('❌ Erreur lors de l\'extraction du nom d\'utilisateur du destinataire:', error.message);
       return 'unknown';
     }
   }
 
-
-
-
-
-
-
-
+  // 🔍 Vérifier si un gift est encore sur le compte @WxyzCrypto
+  async verifyGiftOnAccount(message) {
+    try {
+      // 🎯 VÉRIFIER SI LE MESSAGE EST UN WITHDRAW (gift envoyé par @WxyzCrypto)
+      if (message.out) {
+        console.log('🚫 Message envoyé par @WxyzCrypto - gift retiré');
+        return false; // Gift retiré
+      }
+      
+      // 🎯 VÉRIFIER SI LE MESSAGE EST UN GIFT REÇU (gift sur le compte @WxyzCrypto)
+      if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
+        const action = message.action;
+        
+        // 🔍 LOGIQUE CORRIGÉE : Seuls les gifts avec transferred=false sont sur le compte
+        if (action.transferred === false) {
+          console.log('✅ Gift non transféré - encore sur le compte @WxyzCrypto');
+          return true;
+        }
+        
+        // 🚫 TOUT LE RESTE EST CONSIDÉRÉ COMME RETIRÉ
+        console.log('🚫 Gift transféré ou retiré - pas d\'ajout à l\'inventaire');
+        return false;
+      }
+      
+      // Si ce n'est pas un gift, on ne l'ajoute pas à l'inventaire
+      console.log('❌ Pas un gift Telegram - pas d\'ajout à l\'inventaire');
+      return false;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la vérification du gift sur le compte:', error.message);
+      // En cas d'erreur, on ne l'ajoute pas à l'inventaire par sécurité
+      return false;
+    }
+  }
 
   // Envoyer le webhook
   async sendWebhook(eventType, data) {
@@ -646,26 +701,15 @@ class TelegramGiftDetector {
       
       const signature = this.generateWebhookSignature(payload);
       
-      // Utiliser l'API d'inventaire
-      const webhookUrl = this.webhookUrl.replace('/deposit-webhook', '/inventory-webhook');
-      
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(this.webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Telegram-Signature': signature,
-          'X-Telegram-Timestamp': Math.floor(Date.now() / 1000).toString(),
-          'x-vercel-protection-bypass': this.vercelBypassToken
+          'X-Webhook-Signature': signature,
+          'X-API-Key': this.apiKey
         },
         body: JSON.stringify(payload)
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      console.log(`✅ Webhook d'inventaire envoyé avec succès:`, result);
       
       return response;
       
@@ -698,12 +742,7 @@ class TelegramGiftDetector {
       clearInterval(this.pollingInterval);
     }
     if (this.client) {
-      try {
-        await this.client.disconnect();
-        await this.client.destroy(); // Fix pour le bug GramJS #615
-      } catch (error) {
-        console.log('⚠️  Erreur lors de l\'arrêt du client:', error.message);
-      }
+      await this.client.disconnect();
     }
     this.isRunning = false;
     console.log('🛑 Détecteur de gifts Telegram arrêté');
@@ -711,4 +750,3 @@ class TelegramGiftDetector {
 }
 
 module.exports = TelegramGiftDetector;
-

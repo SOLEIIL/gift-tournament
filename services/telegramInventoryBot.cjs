@@ -1,13 +1,16 @@
 // services/telegramInventoryBot.js
 const crypto = require('crypto');
-const InventoryManager = require('./inventoryManager.cjs');
+const VirtualInventoryManager = require('./virtualInventoryManager.cjs');
 
 class TelegramInventoryBot {
-  constructor(config) {
+  constructor(config, virtualInventoryManager = null) {
     this.config = config;
     this.botToken = config.botToken;
     this.depositAccountUsername = config.depositAccountUsername;
-    this.inventoryManager = new InventoryManager();
+    
+    // Utiliser l'instance partagée ou en créer une nouvelle
+    this.virtualInventory = virtualInventoryManager || new VirtualInventoryManager();
+    
     this.isRunning = false;
     this.updateId = 0;
   }
@@ -201,8 +204,14 @@ class TelegramInventoryBot {
   // Afficher l'inventaire d'un utilisateur
   async showInventory(chatId, userId, username) {
     try {
-      const inventory = await this.inventoryManager.getUserInventory(userId);
-      const stats = await this.inventoryManager.getInventoryStats(userId);
+      const inventory = this.virtualInventory.getUserInventory(userId);
+      
+      // Calculer les statistiques basiques
+      const stats = {
+        totalGifts: inventory.length,
+        totalValue: inventory.reduce((sum, gift) => sum + (gift.giftValue || 0), 0),
+        uniqueGifts: new Set(inventory.map(gift => gift.giftName)).size
+      };
       
       if (inventory.length === 0) {
         await this.sendMessage(chatId, `📦 @${username}, votre inventaire est vide.\n\n💡 Envoyez un gift à @${this.depositAccountUsername} pour commencer !`);
@@ -260,7 +269,16 @@ class TelegramInventoryBot {
   // Afficher les statistiques
   async showStats(chatId, userId, username) {
     try {
-      const stats = await this.inventoryManager.getInventoryStats(userId);
+      const inventory = this.virtualInventory.getUserInventory(userId);
+      
+      // Calculer les statistiques basiques
+      const stats = {
+        totalGifts: inventory.length,
+        totalValue: inventory.reduce((sum, gift) => sum + (gift.giftValue || 0), 0),
+        uniqueGifts: new Set(inventory.map(gift => gift.giftName)).size,
+        rarestGift: inventory.length > 0 ? inventory[0].giftName : null,
+        mostCommonGift: inventory.length > 0 ? inventory[0].giftName : null
+      };
       
       let message = `📊 **Statistiques de @${username}**\n\n`;
       message += `🎁 **Gifts :**\n`;
@@ -296,7 +314,11 @@ class TelegramInventoryBot {
   // Rechercher un gift
   async searchGift(chatId, userId, username, searchTerm) {
     try {
-      const results = await this.inventoryManager.findGiftInInventory(userId, searchTerm);
+      const inventory = this.virtualInventory.getUserInventory(userId);
+      const results = inventory.filter(gift => 
+        gift.giftName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        gift.collectibleId.toLowerCase().includes(searchTerm.toLowerCase())
+      );
       
       if (results.length === 0) {
         await this.sendMessage(chatId, `🔍 Aucun gift trouvé pour "${searchTerm}" dans votre inventaire.`);

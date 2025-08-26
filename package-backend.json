@@ -1,0 +1,32 @@
+{
+  "name": "gift-tournament-backend",
+  "version": "1.0.0",
+  "description": "Backend pour le système de détection de gifts et d'inventaire virtuel",
+  "main": "start-gift-system.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node start-gift-system.cjs",
+    "dev": "node start-gift-system.cjs",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "telegram": "^2.26.22",
+    "dotenv": "^16.6.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "gifts",
+    "inventory",
+    "bot",
+    "crypto"
+  ],
+  "author": "WxyzCrypto",
+  "license": "MIT"
+}
