@@ -258,6 +258,39 @@ class TelegramGiftDetector {
     }
   }
 
+  // 🔍 Détecter si c'est un message de withdraw
+  isWithdrawMessage(message) {
+    try {
+      // Un withdraw = message envoyé PAR @WxyzCrypto VERS un utilisateur
+      // Vérifier si l'expéditeur est @WxyzCrypto
+      
+      // Méthode 1: Vérifier message.out (message envoyé par nous)
+      if (message.out === true) {
+        return true;
+      }
+      
+      // Méthode 2: Vérifier si l'expéditeur est @WxyzCrypto
+      const senderId = this.extractSenderId(message);
+      if (senderId === 'unknown') {
+        // Si on ne peut pas identifier l'expéditeur, utiliser message.out
+        return message.out === true;
+      }
+      
+      // Méthode 3: Vérifier si c'est un message de service (gift envoyé)
+      if (message.className === 'MessageService') {
+        // Les messages de service sont souvent des withdraws
+        return true;
+      }
+      
+      // Par défaut, considérer comme un dépôt (gift reçu)
+      return false;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la détection du withdraw:', error.message);
+      return false;
+    }
+  }
+
   // Traiter un message de gift
   async processGiftMessage(message, isFromHistory = false) {
     try {
@@ -299,8 +332,13 @@ class TelegramGiftDetector {
         isFromHistory: isFromHistory
       };
       
-      // Si c'est un withdraw (message.out = true)
-      if (message.out) {
+      // 🔍 DÉTECTION INTELLIGENTE DES WITHDRAWS
+      // Un withdraw = message envoyé PAR @WxyzCrypto VERS un utilisateur
+      // Un dépôt = message reçu PAR @WxyzCrypto DEPUIS un utilisateur
+      
+      const isWithdraw = this.isWithdrawMessage(message);
+      
+      if (isWithdraw) {
         eventType = 'gift_withdrawn';
         eventData = {
           toUserId: this.extractRecipientId(message),
