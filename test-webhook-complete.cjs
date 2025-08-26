@@ -1,5 +1,5 @@
-// test-webhook-final.cjs
-// Test final du webhook maintenant que l'API est déployée
+// test-webhook-complete.cjs
+// Test complet du webhook maintenant que l'API simple fonctionne
 const crypto = require('crypto');
 const fetch = require('node-fetch').default;
 
@@ -20,14 +20,14 @@ const testGiftData = {
     fromFirstName: 'Drole',
     fromLastName: 'Test',
     toDepositAccount: 'WxyzCrypto',
-    giftName: 'Lol Pop Test Final',
+    giftName: 'Lol Pop Test Complet',
     giftValue: 14559,
     giftType: 'star_gift_unique',
     mediaType: 'star_gift_unique',
-    collectibleId: 'LolPop-Test-Final-123',
-    collectibleModel: 'Test Model Final',
-    collectibleBackdrop: 'Test Backdrop Final',
-    collectibleSymbol: 'Test Symbol Final',
+    collectibleId: 'LolPop-Test-Complet-123',
+    collectibleModel: 'Test Model Complet',
+    collectibleBackdrop: 'Test Backdrop Complet',
+    collectibleSymbol: 'Test Symbol Complet',
     isFromHistory: false
   }
 };
@@ -43,16 +43,16 @@ const generateSignature = (payload) => {
     .digest('hex');
 };
 
-// Test du webhook
-async function testWebhook() {
+// Test du webhook complet
+async function testWebhookComplete() {
   try {
-    console.log('🧪 TEST FINAL DU WEBHOOK - API DÉPLOYÉE !');
-    console.log('==============================================');
+    console.log('🧪 TEST WEBHOOK COMPLET - API simple fonctionne !');
+    console.log('==================================================');
     console.log('📡 URL:', TEST_CONFIG.webhookUrl);
     console.log('🔑 Secret:', TEST_CONFIG.webhookSecret.substring(0, 20) + '...');
     console.log('🔓 Token Bypass:', TEST_CONFIG.vercelBypassToken.substring(0, 20) + '...');
     console.log('📊 Données de test:', JSON.stringify(testGiftData, null, 2));
-    console.log('==============================================\n');
+    console.log('==================================================\n');
 
     // Générer la signature
     const signature = generateSignature(testGiftData);
@@ -60,10 +60,10 @@ async function testWebhook() {
     
     console.log('🔐 Signature générée:', signature);
     console.log('⏰ Timestamp:', timestamp);
-    console.log('==============================================\n');
+    console.log('==================================================\n');
 
     // Envoyer la requête avec le token de bypass
-    console.log('📤 Envoi de la requête avec token de bypass...');
+    console.log('📤 Envoi de la requête avec signature et token de bypass...');
     const response = await fetch(TEST_CONFIG.webhookUrl, {
       method: 'POST',
       headers: {
@@ -81,26 +81,25 @@ async function testWebhook() {
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ SUCCÈS ! Réponse:', result);
-      console.log('\n🎉 Le webhook fonctionne parfaitement !');
-      console.log('🚀 Votre bot @testnftbuybot recevra les données !');
-      console.log('📊 L\'inventaire sera mis à jour automatiquement !');
-      console.log('\n🎯 MAINTENANT, TESTONS LE DÉTECTEUR COMPLET !');
+      console.log('✅ SUCCÈS ! Webhook complet fonctionne !');
+      console.log('📊 Réponse:', result);
+      console.log('\n🎉 VOTRE SYSTÈME EST 100% FONCTIONNEL !');
+      console.log('🚀 Le détecteur peut maintenant synchroniser l\'inventaire !');
     } else {
       const errorText = await response.text();
       console.log('❌ ERREUR ! Détails:', errorText);
-      console.log('\n🔧 Problème à résoudre avant de tester le détecteur');
+      console.log('\n🔍 PROBLÈME DANS inventory-webhook.js :');
+      console.log('   - Dépendance manquante ?');
+      console.log('   - Variables d\'environnement ?');
+      console.log('   - Erreur de logique ?');
+      console.log('\n📋 Vérifiez les logs Vercel pour inventory-webhook.js');
     }
 
   } catch (error) {
     console.error('💥 Erreur fatale:', error.message);
-    console.log('\n🔍 Vérifiez :');
-    console.log('   - L\'URL du webhook est-elle correcte ?');
-    console.log('   - Le secret correspond-il ?');
-    console.log('   - Le token de bypass est-il valide ?');
   }
 }
 
 // Lancer le test
-console.log('🚀 Démarrage du test final webhook - API déployée !\n');
-testWebhook();
+console.log('🚀 Test du webhook complet maintenant que l\'API simple fonctionne !\n');
+testWebhookComplete();
