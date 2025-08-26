@@ -258,24 +258,7 @@ class TelegramGiftDetector {
     }
   }
 
-  // 🔍 Détecter si c'est un message de withdraw
-  isWithdrawMessage(message) {
-    try {
-      // 🎯 LOGIQUE CORRIGÉE :
-      // - DÉPÔT = Gift reçu PAR @WxyzCrypto DEPUIS un utilisateur (message.out = false)
-      // - WITHDRAW = Gift envoyé PAR @WxyzCrypto VERS un utilisateur (message.out = true)
-      
-      // Seule méthode fiable : message.out
-      // message.out = true → message envoyé par @WxyzCrypto → WITHDRAW
-      // message.out = false → message reçu par @WxyzCrypto → DÉPÔT
-      
-      return message.out === true;
-      
-    } catch (error) {
-      console.error('❌ Erreur lors de la détection du withdraw:', error.message);
-      return false;
-    }
-  }
+
 
   // Traiter un message de gift
   async processGiftMessage(message, isFromHistory = false) {
@@ -306,25 +289,17 @@ class TelegramGiftDetector {
         }
       }
       
-      // Déterminer le type d'événement
-      let eventType = 'transfer_received';
-      let eventData = {
-        fromUserId: fromUserId,
-        fromUsername: this.extractSenderUsername(message),
-        fromFirstName: this.extractSenderFirstName(message),
-        fromLastName: this.extractSenderLastName(message),
-        toDepositAccount: this.depositAccountUsername,
-        ...giftInfo,
-        isFromHistory: isFromHistory
-      };
+
       
-      // 🔍 DÉTECTION INTELLIGENTE DES WITHDRAWS
-      // Un withdraw = message envoyé PAR @WxyzCrypto VERS un utilisateur
-      // Un dépôt = message reçu PAR @WxyzCrypto DEPUIS un utilisateur
+      // 🎯 LOGIQUE SIMPLIFIÉE :
+      // - @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire de l'expéditeur
+      // - @WxyzCrypto envoie un gift → RETIRER de l'inventaire du destinataire
       
-      const isWithdraw = this.isWithdrawMessage(message);
+      // Déterminer si c'est un withdraw (message envoyé par @WxyzCrypto)
+      const isWithdraw = message.out === true;
       
       if (isWithdraw) {
+        // WITHDRAW : @WxyzCrypto envoie un gift → RETIRER de l'inventaire
         eventType = 'gift_withdrawn';
         eventData = {
           toUserId: this.extractRecipientId(message),
@@ -332,6 +307,18 @@ class TelegramGiftDetector {
           toFirstName: this.extractRecipientFirstName(message),
           toLastName: this.extractRecipientLastName(message),
           fromDepositAccount: this.depositAccountUsername,
+          ...giftInfo,
+          isFromHistory: isFromHistory
+        };
+      } else {
+        // DÉPÔT : @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire
+        eventType = 'transfer_received';
+        eventData = {
+          fromUserId: fromUserId,
+          fromUsername: this.extractSenderUsername(message),
+          fromFirstName: this.extractSenderFirstName(message),
+          fromLastName: this.extractSenderLastName(message),
+          toDepositAccount: this.depositAccountUsername,
           ...giftInfo,
           isFromHistory: isFromHistory
         };
