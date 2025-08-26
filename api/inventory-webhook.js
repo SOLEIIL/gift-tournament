@@ -1,5 +1,5 @@
 // api/inventory-webhook.js
-import { InventoryManager } from '../../lib/supabase.js';
+const { InventoryManager } = require('../../lib/supabase.js');
 
 // Configuration sécurisée
 const INVENTORY_CONFIG = {
