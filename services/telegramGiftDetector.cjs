@@ -286,10 +286,35 @@ class TelegramGiftDetector {
                 console.log(`🔍 Username trouvé: @${user.username}`);
                 return user.username;
               }
+              
+              // Si pas de username, essayer avec getInputEntity
+              try {
+                const inputUser = this.client.getInputEntity(userId);
+                console.log(`🔍 InputEntity récupéré:`, inputUser);
+                if (inputUser && inputUser.username) {
+                  console.log(`🔍 Username via InputEntity: @${inputUser.username}`);
+                  return inputUser.username;
+                }
+              } catch (e2) {
+                console.log(`⚠️  InputEntity échoué: ${e2.message}`);
+              }
             } catch (e) {
-              console.log(`⚠️  Impossible de récupérer l'utilisateur ${userId}: ${e.message}`);
+              console.log(`⚠️  getEntity échoué: ${e.message}`);
             }
           }
+          
+          // Fallback : essayer de récupérer via resolvePeer
+          try {
+            const resolved = this.client.resolvePeer(userId);
+            console.log(`🔍 ResolvePeer récupéré:`, resolved);
+            if (resolved && resolved.username) {
+              console.log(`🔍 Username via ResolvePeer: @${resolved.username}`);
+              return resolved.username;
+            }
+          } catch (e3) {
+            console.log(`⚠️  ResolvePeer échoué: ${e3.message}`);
+          }
+          
           return `user_${userId}`;
         }
         
@@ -364,11 +389,24 @@ class TelegramGiftDetector {
       // - Expéditeur = autre utilisateur → DÉPÔT → AJOUTER à l'inventaire
       
       const senderUsername = this.extractSenderUsername(message);
-      const isWithdraw = senderUsername === this.depositAccountUsername;
+      
+      // 🎯 DÉTECTION WITHDRAW : Deux méthodes
+      // Méthode 1: Par username (si fiable)
+      const isWithdrawByUsername = senderUsername === this.depositAccountUsername;
+      
+      // Méthode 2: Par message.out (plus fiable)
+      const isWithdrawByOut = message.out === true;
+      
+      // Utiliser la méthode la plus fiable
+      const isWithdraw = isWithdrawByOut;
       
       console.log(`🔍 Expéditeur détecté: @${senderUsername}`);
       console.log(`🔍 Compte dépôt: @${this.depositAccountUsername}`);
-      console.log(`🔍 Détection withdraw: ${isWithdraw}`);
+      console.log(`🔍 Détection withdraw - Username: ${isWithdrawByUsername}, Message.out: ${isWithdrawByOut}`);
+      console.log(`🔍 Détection withdraw finale: ${isWithdraw}`);
+      console.log(`🔍 Message.out: ${message.out}`);
+      console.log(`🔍 Message.fromId: ${message.fromId}`);
+      console.log(`🔍 Message.sender:`, message.sender);
       console.log('==========================================\n');
       
       if (isWithdraw) {
@@ -629,3 +667,4 @@ class TelegramGiftDetector {
 }
 
 module.exports = TelegramGiftDetector;
+
