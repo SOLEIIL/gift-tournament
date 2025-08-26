@@ -2,32 +2,25 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "ALLOWALL"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://web.telegram.org https://t.me;"
-        }
-      ]
+  "functions": {
+    "api/inventory-webhook.js": {
+      "maxDuration": 30
+    },
+    "api/user-inventory.js": {
+      "maxDuration": 30
+    },
+    "api/deposit-webhook.js": {
+      "maxDuration": 30
     }
-  ]
+  }
 }
