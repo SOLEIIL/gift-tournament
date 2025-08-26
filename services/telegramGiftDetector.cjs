@@ -127,7 +127,10 @@ class TelegramGiftDetector {
           const username = dialog.entity.username || dialog.entity.firstName || 'Unknown';
           
           try {
-            const messages = await this.client.getMessages(dialog.entity, { limit: 50 });
+            // 🚨 SCAN AGRESSIF : Vérifier 200 messages au lieu de 50
+            const messages = await this.client.getMessages(dialog.entity, { limit: 200 });
+            
+            console.log(`🔍 Scan du chat @${username}: ${messages.length} messages analysés`);
             
             // Initialiser le dernier ID de message pour ce chat
             if (messages.length > 0) {
@@ -166,8 +169,47 @@ class TelegramGiftDetector {
       
       console.log(`✅ Scan terminé: ${nativeGiftsFound} gifts uniques trouvés`);
       
+      // 🚨 SCAN SPÉCIAL : Vérifier le compte @WxyzCrypto lui-même
+      console.log('🔍 SCAN SPÉCIAL : Vérification du compte @WxyzCrypto...');
+      await this.scanWxyzCryptoAccount();
+      
     } catch (error) {
       console.error('❌ Erreur lors du scan de l\'historique:', error.message);
+    }
+  }
+
+  // 🚨 SCAN SPÉCIAL : Vérifier le compte @WxyzCrypto pour les gifts non détectés
+  async scanWxyzCryptoAccount() {
+    try {
+      console.log('🔍 Scan du compte @WxyzCrypto pour les gifts...');
+      
+      // Récupérer les messages du compte @WxyzCrypto
+      const me = await this.client.getMe();
+      const messages = await this.client.getMessages(me, { limit: 100 });
+      
+      console.log(`🔍 ${messages.length} messages analysés sur le compte @WxyzCrypto`);
+      
+      let giftsFound = 0;
+      for (const message of messages) {
+        if (this.isRealTelegramGift(message)) {
+          const giftInfo = this.extractGiftInfo(message);
+          if (giftInfo) {
+            giftsFound++;
+            console.log(`🎁 GIFT TROUVÉ sur @WxyzCrypto: ${giftInfo.giftName} #${giftInfo.collectibleId}`);
+            
+            // Traiter le gift comme un dépôt
+            const success = await this.processGiftMessage(message, true);
+            if (success) {
+              console.log(`✅ Gift traité avec succès: ${giftInfo.giftName}`);
+            }
+          }
+        }
+      }
+      
+      console.log(`✅ Scan @WxyzCrypto terminé: ${giftsFound} gifts trouvés`);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du scan @WxyzCrypto:', error.message);
     }
   }
 
