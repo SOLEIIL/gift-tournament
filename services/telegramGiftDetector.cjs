@@ -471,13 +471,27 @@ class TelegramGiftDetector {
   // Extraire l'ID de l'expéditeur
   extractSenderId(message) {
     try {
+      // 🎯 PRIORITÉ 1: message.sender.id (pour les WITHDRAWS)
+      if (message.sender && message.sender.id) {
+        console.log(`🔍 Sender ID trouvé: ${message.sender.id}`);
+        return message.sender.id.toString();
+      }
+      
+      // 🎯 PRIORITÉ 2: message.fromId (pour les DÉPÔTS)
       if (message.fromId) {
+        console.log(`🔍 FromId trouvé: ${message.fromId}`);
         return message.fromId.toString();
       }
+      
+      // 🎯 PRIORITÉ 3: message.peerId.userId (fallback)
       if (message.peerId && message.peerId.userId) {
+        console.log(`🔍 PeerId userId trouvé: ${message.peerId.userId}`);
         return message.peerId.userId.toString();
       }
+      
+      console.log(`🔍 Aucun ID d'expéditeur trouvé`);
       return 'unknown';
+      
     } catch (error) {
       console.error('❌ Erreur lors de l\'extraction de l\'ID de l\'expéditeur:', error.message);
       return 'unknown';
