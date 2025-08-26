@@ -261,16 +261,29 @@ class TelegramGiftDetector {
   // 🔍 Extraire le destinataire depuis la conversation (pour les withdraws)
   extractRecipientFromConversation(message) {
     try {
+      console.log(`🔍 EXTRACTION DESTINATAIRE - Message structure:`, {
+        peerId: message.peerId,
+        chat: message.chat,
+        fromId: message.fromId,
+        toId: message.toId
+      });
+      
       // Pour un withdraw, le destinataire est dans le chat/peer
       if (message.peerId) {
+        console.log(`🔍 peerId trouvé:`, message.peerId);
+        
         // Si c'est un chat privé, le destinataire est l'utilisateur
         if (message.peerId.className === 'PeerUser') {
           const userId = message.peerId.userId.toString();
+          console.log(`🔍 Chat privé avec utilisateur ID: ${userId}`);
+          
           // Essayer de récupérer l'utilisateur depuis le cache du client
           if (this.client && this.client.getEntity) {
             try {
               const user = this.client.getEntity(userId);
+              console.log(`🔍 Utilisateur récupéré:`, user);
               if (user && user.username) {
+                console.log(`🔍 Username trouvé: @${user.username}`);
                 return user.username;
               }
             } catch (e) {
@@ -282,15 +295,18 @@ class TelegramGiftDetector {
         
         // Si c'est un chat de groupe, essayer d'extraire depuis le message
         if (message.peerId.className === 'PeerChat' || message.peerId.className === 'PeerChannel') {
+          console.log(`🔍 Chat de groupe/canal: ${message.peerId.className}`);
           return 'group_chat';
         }
       }
       
       // Fallback : utiliser le nom du chat si disponible
       if (message.chat && message.chat.title) {
+        console.log(`🔍 Fallback chat title: ${message.chat.title}`);
         return message.chat.title;
       }
       
+      console.log(`🔍 Aucun destinataire trouvé`);
       return 'unknown_recipient';
       
     } catch (error) {
