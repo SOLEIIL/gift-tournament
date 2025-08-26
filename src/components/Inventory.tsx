@@ -69,7 +69,7 @@ export const Inventory: React.FC<InventoryProps> = ({
   useEffect(() => {
     loadInventory();
     
-    // PAS DE REFRESH AUTOMATIQUE - SEULEMENT AU MONTAGE
+    // PAS DE REFRESH AUTOMATIQUE - SEULEMENT AU MONTAGE DU COMPOSANT
     // const interval = setInterval(loadInventory, 3000);
     // return () => clearInterval(interval);
   }, []);

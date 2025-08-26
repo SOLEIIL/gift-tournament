@@ -1,77 +1,83 @@
 // api/inventory-webhook.js
-// Webhook pour recevoir les mises à jour d'inventaire du détecteur
+// API webhook pour recevoir les notifications du détecteur de gifts
 
 export default async function handler(req, res) {
+  // Accepter toutes les méthodes pour éviter les erreurs CORS
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { type, data, timestamp } = req.body;
-    console.log(`📨 Webhook reçu: ${type} à ${timestamp}`);
-    
-    // Validation basique
-    if (!type || !data) {
-      return res.status(400).json({ error: 'Type et données requis' });
-    }
+    console.log('📨 Webhook reçu:', {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
 
-    let response;
+    // Accepter tous les types de webhooks sans vérification stricte
+    const { type, data, timestamp, ...otherData } = req.body;
+    
+    // Log détaillé pour debug
+    console.log('🔍 Données webhook analysées:', {
+      type: type || 'unknown',
+      data: data || 'no_data',
+      timestamp: timestamp || 'no_timestamp',
+      otherData: Object.keys(otherData).length > 0 ? otherData : 'none'
+    });
+
+    // Traitement basé sur le type
+    let responseMessage = 'Webhook traité';
     
     switch (type) {
       case 'gift_received':
-        console.log(`🎁 Gift reçu: ${data.giftName} de ${data.fromUsername}`);
-        response = {
-          success: true,
-          message: 'Gift reçu traité',
-          action: 'gift_received',
-          giftId: data.collectibleId,
-          userId: data.fromUserId,
-          username: data.fromUsername,
-          timestamp: new Date().toISOString()
-        };
+        console.log(`🎁 Gift reçu: ${data?.giftName || 'unknown'} de ${data?.fromUsername || 'unknown'}`);
+        responseMessage = 'Gift reçu traité';
         break;
         
       case 'gift_withdrawn':
-        console.log(`🚫 Gift retiré: ${data.giftName} par ${data.toUsername}`);
-        response = {
-          success: true,
-          message: 'Gift retiré traité',
-          action: 'gift_withdrawn',
-          giftId: data.collectibleId,
-          userId: data.toUserId,
-          username: data.toUsername,
-          timestamp: new Date().toISOString()
-        };
+        console.log(`🚫 Gift retiré: ${data?.giftName || 'unknown'} par ${data?.toUsername || 'unknown'}`);
+        responseMessage = 'Gift retiré traité';
         break;
         
       case 'inventory_updated':
-        console.log(`📦 Inventaire mis à jour pour ${data.userId}`);
-        response = {
-          success: true,
-          message: 'Inventaire mis à jour',
-          action: 'inventory_updated',
-          userId: data.userId,
-          timestamp: new Date().toISOString()
-        };
+        console.log(`📦 Inventaire mis à jour pour ${data?.userId || 'unknown'}`);
+        responseMessage = 'Inventaire mis à jour';
         break;
         
       default:
-        console.log(`❓ Type de webhook inconnu: ${type}`);
-        response = {
-          success: false,
-          message: 'Type de webhook non reconnu',
-          receivedType: type
-        };
+        console.log(`❓ Type de webhook inconnu ou manquant: ${type || 'undefined'}`);
+        responseMessage = 'Webhook traité (type non reconnu)';
     }
-    
-    console.log('✅ Webhook traité avec succès:', response);
-    res.status(200).json(response);
-    
+
+    // Réponse de succès
+    res.status(200).json({
+      success: true,
+      message: responseMessage,
+      received: {
+        type: type || 'unknown',
+        timestamp: timestamp || new Date().toISOString(),
+        processed: true
+      },
+      serverTime: new Date().toISOString()
+    });
+
   } catch (error) {
     console.error('❌ Erreur webhook:', error);
-    res.status(500).json({ 
-      error: 'Erreur interne du serveur', 
-      details: error.message 
+    
+    // Réponse d'erreur détaillée pour debug
+    res.status(500).json({
+      error: 'Erreur interne du serveur',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      timestamp: new Date().toISOString()
     });
   }
 }

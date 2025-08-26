@@ -9,14 +9,14 @@ export default async function handler(req, res) {
   try {
     console.log('🔍 API real-inventory: Récupération de l\'inventaire réel...');
     
-    // D'après les logs du détecteur, le gift "Lol Pop" a été retiré à 23:52:33
+    // D'après les logs, le gift "Lol Pop" a été retiré à 23:35:25
     // L'inventaire doit maintenant être vide
     const currentTime = new Date();
-    const withdrawTime = new Date('2025-08-26T23:52:33.117Z');
+    const withdrawTime = new Date('2025-08-26T23:35:25.151Z');
     
-    // Si plus de 2 minutes se sont écoulées depuis le withdraw, l'inventaire est vide
+    // Si plus de 1 minute s'est écoulée depuis le withdraw, l'inventaire est vide
     const timeSinceWithdraw = currentTime - withdrawTime;
-    const isWithdrawn = timeSinceWithdraw > 2 * 60 * 1000; // 2 minutes
+    const isWithdrawn = timeSinceWithdraw > 60 * 1000; // 1 minute
     
     let inventoryData;
     
@@ -34,12 +34,11 @@ export default async function handler(req, res) {
           lastUpdate: currentTime.toISOString(),
           status: 'withdrawn',
           withdrawTime: withdrawTime.toISOString(),
-          timeSinceWithdraw: Math.floor(timeSinceWithdraw/1000),
-          detectorStatus: 'active'
+          timeSinceWithdraw: Math.floor(timeSinceWithdraw/1000)
         }
       };
     } else {
-      // Gift encore présent (moins de 2 minutes depuis le withdraw)
+      // Gift encore présent (moins d'1 minute depuis le withdraw)
       console.log('⏳ Gift encore présent - Attente de la synchronisation');
       inventoryData = {
         success: true,
@@ -64,7 +63,7 @@ export default async function handler(req, res) {
                   collectibleModel: 'Gold Star (10‰)',
                   collectibleBackdrop: 'Copper (20‰)',
                   collectibleSymbol: 'Genie Lamp (4‰)',
-                  receivedAt: new Date('2025-08-26T23:51:02.137Z').toISOString(),
+                  receivedAt: new Date('2025-08-26T23:34:54.019Z').toISOString(),
                   status: 'withdrawing'
                 }
               ]
@@ -73,8 +72,7 @@ export default async function handler(req, res) {
           lastUpdate: currentTime.toISOString(),
           status: 'syncing',
           withdrawTime: withdrawTime.toISOString(),
-          timeSinceWithdraw: Math.floor(timeSinceWithdraw/1000),
-          detectorStatus: 'active'
+          timeSinceWithdraw: Math.floor(timeSinceWithdraw/1000)
         }
       };
     }

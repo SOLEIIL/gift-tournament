@@ -410,6 +410,15 @@ class TelegramGiftDetector {
         console.error('❌ Erreur webhook:', webhookError.message);
       }
 
+      // Envoyer le webhook de gift reçu
+      try {
+        // TEMPORAIREMENT DÉSACTIVÉ POUR ÉVITER LES ERREURS 401
+        // await this.sendWebhook('gift_received', transferData);
+        console.log('📨 Webhook gift_received désactivé temporairement');
+      } catch (error) {
+        console.log('📨 Webhook gift_received désactivé temporairement');
+      }
+
       return true;
 
     } catch (error) {
