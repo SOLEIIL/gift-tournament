@@ -277,44 +277,11 @@ class TelegramGiftDetector {
           const userId = message.peerId.userId.toString();
           console.log(`🔍 Chat privé avec utilisateur ID: ${userId}`);
           
-          // Essayer de récupérer l'utilisateur depuis le cache du client
-          if (this.client && this.client.getEntity) {
-            try {
-              const user = this.client.getEntity(userId);
-              console.log(`🔍 Utilisateur récupéré:`, user);
-              if (user && user.username) {
-                console.log(`🔍 Username trouvé: @${user.username}`);
-                return user.username;
-              }
-              
-              // Si pas de username, essayer avec getInputEntity
-              try {
-                const inputUser = this.client.getInputEntity(userId);
-                console.log(`🔍 InputEntity récupéré:`, inputUser);
-                if (inputUser && inputUser.username) {
-                  console.log(`🔍 Username via InputEntity: @${inputUser.username}`);
-                  return inputUser.username;
-                }
-              } catch (e2) {
-                console.log(`⚠️  InputEntity échoué: ${e2.message}`);
-              }
-            } catch (e) {
-              console.log(`⚠️  getEntity échoué: ${e.message}`);
-            }
-          }
+          // 🎯 SOLUTION SIMPLE : Utiliser l'ID directement
+          // D'après Stack Overflow, on ne peut pas récupérer le username par ID sans chat préalable
+          // Donc on utilise l'ID comme identifiant unique
           
-          // Fallback : essayer de récupérer via resolvePeer
-          try {
-            const resolved = this.client.resolvePeer(userId);
-            console.log(`🔍 ResolvePeer récupéré:`, resolved);
-            if (resolved && resolved.username) {
-              console.log(`🔍 Username via ResolvePeer: @${resolved.username}`);
-              return resolved.username;
-            }
-          } catch (e3) {
-            console.log(`⚠️  ResolvePeer échoué: ${e3.message}`);
-          }
-          
+          console.log(`🔍 Utilisation de l'ID utilisateur directement: ${userId}`);
           return userId;
         }
         
@@ -393,12 +360,12 @@ class TelegramGiftDetector {
         console.log(`🔄 WITHDRAW détecté: ${giftInfo.giftName} envoyé par @WxyzCrypto`);
         
         // Récupérer le destinataire depuis la conversation
-        const recipientUsername = this.extractRecipientFromConversation(message);
-        console.log(`👤 Destinataire détecté: @${recipientUsername}`);
+        const recipientId = this.extractRecipientFromConversation(message);
+        console.log(`👤 Destinataire détecté: ID ${recipientId}`);
         
         const eventType = 'gift_withdrawn';
         const eventData = {
-          toUsername: recipientUsername,
+          toUserId: recipientId,
           fromDepositAccount: this.depositAccountUsername,
           ...giftInfo,
           isFromHistory: isFromHistory
@@ -406,7 +373,7 @@ class TelegramGiftDetector {
         
         // Envoyer le webhook
         await this.sendWebhook(eventType, eventData);
-        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${recipientUsername}`);
+        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de l'utilisateur ${recipientId}`);
         
         return true;
       }
