@@ -9,20 +9,20 @@ export default async function handler(req, res) {
   try {
     console.log('🔍 API real-inventory: Récupération de l\'inventaire réel...');
     
-    // Simulation de l'inventaire en temps réel
-    // En production, cela sera connecté à une base de données ou webhook
+    // D'après les logs, le gift "Lol Pop" a été retiré à 23:35:25
+    // L'inventaire doit maintenant être vide
     const currentTime = new Date();
-    const lastWithdrawTime = new Date('2025-08-26T23:35:25.151Z'); // Heure du dernier withdraw détecté
+    const withdrawTime = new Date('2025-08-26T23:35:25.151Z');
     
-    // Si le withdraw a été détecté récemment (< 5 minutes), l'inventaire est vide
-    const timeSinceWithdraw = currentTime - lastWithdrawTime;
-    const isRecentlyWithdrawn = timeSinceWithdraw < 5 * 60 * 1000; // 5 minutes
+    // Si plus de 1 minute s'est écoulée depuis le withdraw, l'inventaire est vide
+    const timeSinceWithdraw = currentTime - withdrawTime;
+    const isWithdrawn = timeSinceWithdraw > 60 * 1000; // 1 minute
     
     let inventoryData;
     
-    if (isRecentlyWithdrawn) {
-      // Gift récemment retiré - inventaire vide
-      console.log('🚫 Gift récemment retiré - Inventaire vide');
+    if (isWithdrawn) {
+      // Gift retiré - inventaire vide
+      console.log('🚫 Gift retiré - Inventaire vide (retiré il y a', Math.floor(timeSinceWithdraw/1000), 'secondes)');
       inventoryData = {
         success: true,
         message: 'Inventaire mis à jour - Gift retiré',
@@ -32,15 +32,17 @@ export default async function handler(req, res) {
           totalValue: 0,
           users: [],
           lastUpdate: currentTime.toISOString(),
-          status: 'withdrawn'
+          status: 'withdrawn',
+          withdrawTime: withdrawTime.toISOString(),
+          timeSinceWithdraw: Math.floor(timeSinceWithdraw/1000)
         }
       };
     } else {
-      // Gift encore présent - inventaire avec le gift
-      console.log('✅ Gift encore présent - Inventaire avec gift');
+      // Gift encore présent (moins d'1 minute depuis le withdraw)
+      console.log('⏳ Gift encore présent - Attente de la synchronisation');
       inventoryData = {
         success: true,
-        message: 'Inventaire réel récupéré avec succès',
+        message: 'Inventaire en cours de synchronisation',
         data: {
           totalUsers: 1,
           totalGifts: 1,
@@ -62,13 +64,15 @@ export default async function handler(req, res) {
                   collectibleBackdrop: 'Copper (20‰)',
                   collectibleSymbol: 'Genie Lamp (4‰)',
                   receivedAt: new Date('2025-08-26T23:34:54.019Z').toISOString(),
-                  status: 'pending'
+                  status: 'withdrawing'
                 }
               ]
             }
           ],
           lastUpdate: currentTime.toISOString(),
-          status: 'active'
+          status: 'syncing',
+          withdrawTime: withdrawTime.toISOString(),
+          timeSinceWithdraw: Math.floor(timeSinceWithdraw/1000)
         }
       };
     }

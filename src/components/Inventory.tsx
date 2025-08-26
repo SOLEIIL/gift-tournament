@@ -34,37 +34,39 @@ export const Inventory: React.FC<InventoryProps> = ({
   const [inventory, setInventory] = useState<UserInventory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   // Charger l'inventaire réel depuis l'API
-  useEffect(() => {
-    const loadInventory = async () => {
-      try {
-        setLoading(true);
-        console.log('🔍 Chargement de l\'inventaire réel...');
-        
-        const response = await fetch('/api/real-inventory');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('📊 Données inventaire reçues:', data);
-        
-        if (data.success && data.data.users.length > 0) {
-          // Prendre le premier utilisateur (pour l'instant)
-          setInventory(data.data.users[0]);
-        } else {
-          setInventory(null);
-        }
-        
-      } catch (err) {
-        console.error('❌ Erreur chargement inventaire:', err);
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      } finally {
-        setLoading(false);
+  const loadInventory = async () => {
+    try {
+      setLoading(true);
+      console.log('🔍 Chargement de l\'inventaire réel...');
+      
+      const response = await fetch('/api/real-inventory');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    };
+      
+      const data = await response.json();
+      console.log('📊 Données inventaire reçues:', data);
+      
+      if (data.success && data.data.users.length > 0) {
+        // Prendre le premier utilisateur (pour l'instant)
+        setInventory(data.data.users[0]);
+        setLastRefresh(new Date());
+      } else {
+        setInventory(null);
+      }
+      
+    } catch (err) {
+      console.error('❌ Erreur chargement inventaire:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadInventory();
     
     // Recharger toutes les 3 secondes pour les mises à jour en temps réel
@@ -113,7 +115,7 @@ export const Inventory: React.FC<InventoryProps> = ({
         {inventory ? (
           <>
             <div className="text-lg text-yellow-400 font-semibold">
-              Total Value: {inventory.totalValue} TON
+              Total Value: {inventory.totalGifts} TON
             </div>
             <div className="text-sm text-gray-400">
               {inventory.totalGifts} gift{inventory.totalGifts !== 1 ? 's' : ''} en collection
@@ -125,6 +127,22 @@ export const Inventory: React.FC<InventoryProps> = ({
         ) : (
           <div className="text-sm text-gray-400">Aucun inventaire trouvé</div>
         )}
+        
+        {/* Bouton de refresh manuel */}
+        <div className="mt-3">
+          <Button
+            onClick={loadInventory}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            disabled={loading}
+          >
+            {loading ? '🔄' : '🔄'} Actualiser
+          </Button>
+          <div className="text-xs text-gray-500 mt-1">
+            Dernière mise à jour: {lastRefresh.toLocaleTimeString()}
+          </div>
+        </div>
       </div>
 
       {/* Inventory Grid */}
