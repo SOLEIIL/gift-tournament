@@ -308,6 +308,32 @@ class TelegramGiftDetector {
     }
   }
 
+  // 🔍 Extraire l'ID Telegram du destinataire (pour les withdraws)
+  extractRecipientUserId(message) {
+    try {
+      // 🎯 PRIORITÉ 1: message.chat.id.value (pour les WITHDRAWS)
+      if (message.chat && message.chat.className === 'User') {
+        const userId = message.chat.id.value.toString();
+        console.log(`🔍 ID Telegram du destinataire extrait: ${userId}`);
+        return userId;
+      }
+      
+      // 🎯 PRIORITÉ 2: message.peerId.userId (fallback)
+      if (message.peerId && message.peerId.className === 'PeerUser') {
+        const userId = message.peerId.userId.toString();
+        console.log(`🔍 Fallback ID Telegram du destinataire: ${userId}`);
+        return userId;
+      }
+      
+      console.log(`🔍 Aucun ID Telegram du destinataire trouvé`);
+      return 'unknown_user_id';
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'extraction de l\'ID Telegram du destinataire:', error.message);
+      return 'error_user_id';
+    }
+  }
+
 
 
   // Traiter un message de gift
@@ -367,9 +393,15 @@ class TelegramGiftDetector {
         const recipientUsername = this.extractRecipientFromConversation(message);
         console.log(`👤 Destinataire détecté: @${recipientUsername}`);
         
+        // 🎯 IMPORTANT : Pour un WITHDRAW, nous devons retirer le gift de l'inventaire
+        // Nous avons besoin de l'ID Telegram de l'utilisateur pour l'inventaire
+        const recipientUserId = this.extractRecipientUserId(message);
+        console.log(`👤 ID Telegram du destinataire: ${recipientUserId}`);
+        
         const eventType = 'gift_withdrawn';
         const eventData = {
           toUsername: recipientUsername,
+          toUserId: recipientUserId,
           fromDepositAccount: this.depositAccountUsername,
           ...giftInfo,
           isFromHistory: isFromHistory
@@ -377,7 +409,7 @@ class TelegramGiftDetector {
         
         // Envoyer le webhook
         await this.sendWebhook(eventType, eventData);
-        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${recipientUsername}`);
+        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${recipientUsername} (ID: ${recipientUserId})`);
         
         return true;
       }
