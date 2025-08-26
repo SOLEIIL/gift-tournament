@@ -258,42 +258,44 @@ class TelegramGiftDetector {
     }
   }
 
-  // 🔍 Détecter si c'est un withdraw en analysant le message Telegram
-  isWithdrawByMessage(message) {
+  // 🔍 Extraire le destinataire depuis la conversation (pour les withdraws)
+  extractRecipientFromConversation(message) {
     try {
-      console.log(`🔍 ANALYSE MESSAGE: "${message.message || 'Aucun texte'}"`);
-      
-      // Analyser le message pour détecter le type d'événement
-      if (message.message) {
-        const messageText = message.message.toLowerCase();
-        console.log(`🔍 Message en minuscules: "${messageText}"`);
-        
-        // Gift ENVOYÉ : "You transferer a unique collectible" → WITHDRAW
-        if (messageText.includes('you transferer') || messageText.includes('you transferred')) {
-          console.log(`🔍 DÉTECTÉ: WITHDRAW (contient "you transferer/transferred")`);
-          return true;
+      // Pour un withdraw, le destinataire est dans le chat/peer
+      if (message.peerId) {
+        // Si c'est un chat privé, le destinataire est l'utilisateur
+        if (message.peerId.className === 'PeerUser') {
+          const userId = message.peerId.userId.toString();
+          // Essayer de récupérer l'utilisateur depuis le cache du client
+          if (this.client && this.client.getEntity) {
+            try {
+              const user = this.client.getEntity(userId);
+              if (user && user.username) {
+                return user.username;
+              }
+            } catch (e) {
+              console.log(`⚠️  Impossible de récupérer l'utilisateur ${userId}: ${e.message}`);
+            }
+          }
+          return `user_${userId}`;
         }
         
-        // Gift REÇU : "(username) transfered a unique collectible to you" → DÉPÔT
-        if (messageText.includes('transfered to you') || messageText.includes('transferred to you')) {
-          console.log(`🔍 DÉTECTÉ: DÉPÔT (contient "transfered/transferred to you")`);
-          return false;
+        // Si c'est un chat de groupe, essayer d'extraire depuis le message
+        if (message.peerId.className === 'PeerChat' || message.peerId.className === 'PeerChannel') {
+          return 'group_chat';
         }
-        
-        console.log(`🔍 Aucun pattern détecté, fallback sur message.out`);
-      } else {
-        console.log(`🔍 Pas de message texte, fallback sur message.out`);
       }
       
-      // Fallback : utiliser message.out si le message n'est pas lisible
-      const fallbackResult = message.out === true;
-      console.log(`🔍 Fallback message.out (${message.out}) = ${fallbackResult}`);
-      return fallbackResult;
+      // Fallback : utiliser le nom du chat si disponible
+      if (message.chat && message.chat.title) {
+        return message.chat.title;
+      }
+      
+      return 'unknown_recipient';
       
     } catch (error) {
-      console.error('❌ Erreur lors de la détection du withdraw par message:', error.message);
-      // Fallback : utiliser message.out
-      return message.out === true;
+      console.error('❌ Erreur lors de l\'extraction du destinataire:', error.message);
+      return 'error_recipient';
     }
   }
 
@@ -341,18 +343,39 @@ class TelegramGiftDetector {
       console.log(`🎁 Gift: ${giftInfo.giftName} (${giftInfo.giftValue}⭐)`);
       console.log(`⏰ Timestamp: ${new Date(message.date * 1000).toISOString()}`);
       
-      // 🎯 LOGIQUE CORRIGÉE BASÉE SUR LES MESSAGES TELEGRAM :
-      // - Gift REÇU : "(username) transfered a unique collectible to you" → DÉPÔT
-      // - Gift ENVOYÉ : "You transferer a unique collectible" → WITHDRAW
+      // 🎯 LOGIQUE SIMPLE ET FIABLE :
+      // - Expéditeur = @WxyzCrypto → WITHDRAW → RETIRER de l'inventaire
+      // - Expéditeur = autre utilisateur → DÉPÔT → AJOUTER à l'inventaire
       
-      // Déterminer le type d'événement en analysant le message
-      const isWithdraw = this.isWithdrawByMessage(message);
+      const senderUsername = this.extractSenderUsername(message);
+      const isWithdraw = senderUsername === this.depositAccountUsername;
+      
+      console.log(`🔍 Expéditeur détecté: @${senderUsername}`);
+      console.log(`🔍 Compte dépôt: @${this.depositAccountUsername}`);
       console.log(`🔍 Détection withdraw: ${isWithdraw}`);
       console.log('==========================================\n');
       
       if (isWithdraw) {
-        console.log(`⚠️  Withdraw détecté (ignoré pour l'instant): ${giftInfo.giftName}`);
-        return false;
+        // WITHDRAW : @WxyzCrypto envoie un gift → RETIRER de l'inventaire
+        console.log(`🔄 WITHDRAW détecté: ${giftInfo.giftName} envoyé par @${senderUsername}`);
+        
+        // Récupérer le destinataire depuis la conversation
+        const recipientUsername = this.extractRecipientFromConversation(message);
+        console.log(`👤 Destinataire détecté: @${recipientUsername}`);
+        
+        const eventType = 'gift_withdrawn';
+        const eventData = {
+          toUsername: recipientUsername,
+          fromDepositAccount: this.depositAccountUsername,
+          ...giftInfo,
+          isFromHistory: isFromHistory
+        };
+        
+        // Envoyer le webhook
+        await this.sendWebhook(eventType, eventData);
+        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${recipientUsername}`);
+        
+        return true;
       }
       
       // DÉPÔT : @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire
