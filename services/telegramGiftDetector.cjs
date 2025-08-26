@@ -315,7 +315,7 @@ class TelegramGiftDetector {
             console.log(`⚠️  ResolvePeer échoué: ${e3.message}`);
           }
           
-          return `user_${userId}`;
+          return userId;
         }
         
         // Si c'est un chat de groupe, essayer d'extraire depuis le message
@@ -373,41 +373,20 @@ class TelegramGiftDetector {
       
 
       
-      // 🔍 LOGS DÉTAILLÉS POUR DIAGNOSTIQUER
-      console.log('\n🔍 === ANALYSE DÉTAILLÉE DU MESSAGE ===');
-      console.log(`📱 Message ID: ${message.id}`);
-      console.log(`📝 Message texte: "${message.message || 'Aucun texte'}"`);
-      console.log(`📤 Message.out: ${message.out}`);
-      console.log(`🏷️  Message class: ${message.className}`);
-      console.log(`👤 Expéditeur ID: ${fromUserId}`);
-      console.log(`👤 Expéditeur username: ${this.extractSenderUsername(message)}`);
-      console.log(`🎁 Gift: ${giftInfo.giftName} (${giftInfo.giftValue}⭐)`);
-      console.log(`⏰ Timestamp: ${new Date(message.date * 1000).toISOString()}`);
+      // 🎯 LOGS ESSENTIELS SEULEMENT
+      console.log(`\n🎁 === GIFT DÉTECTÉ ===`);
+      console.log(`📱 ID: ${message.id}`);
+      console.log(`👤 Expéditeur: ${this.extractSenderUsername(message)} (ID: ${fromUserId})`);
+      console.log(`🎁 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId} (${giftInfo.giftValue}⭐)`);
+      console.log(`🏷️  Traits: ${giftInfo.collectibleModel} | ${giftInfo.collectibleBackdrop} | ${giftInfo.collectibleSymbol}`);
       
-      // 🎯 LOGIQUE SIMPLE ET FIABLE :
-      // - Expéditeur = @WxyzCrypto → WITHDRAW → RETIRER de l'inventaire
-      // - Expéditeur = autre utilisateur → DÉPÔT → AJOUTER à l'inventaire
+      // 🎯 DÉTECTION SIMPLE :
+      // - message.out = true → WITHDRAW (envoyé par @WxyzCrypto)
+      // - message.out = false → DÉPÔT (reçu par @WxyzCrypto)
       
-      const senderUsername = this.extractSenderUsername(message);
-      
-      // 🎯 DÉTECTION WITHDRAW : Deux méthodes
-      // Méthode 1: Par username (si fiable)
-      const isWithdrawByUsername = senderUsername === this.depositAccountUsername;
-      
-      // Méthode 2: Par message.out (plus fiable)
-      const isWithdrawByOut = message.out === true;
-      
-      // Utiliser la méthode la plus fiable
-      const isWithdraw = isWithdrawByOut;
-      
-      console.log(`🔍 Expéditeur détecté: @${senderUsername}`);
-      console.log(`🔍 Compte dépôt: @${this.depositAccountUsername}`);
-      console.log(`🔍 Détection withdraw - Username: ${isWithdrawByUsername}, Message.out: ${isWithdrawByOut}`);
-      console.log(`🔍 Détection withdraw finale: ${isWithdraw}`);
-      console.log(`🔍 Message.out: ${message.out}`);
-      console.log(`🔍 Message.fromId: ${message.fromId}`);
-      console.log(`🔍 Message.sender:`, message.sender);
-      console.log('==========================================\n');
+      const isWithdraw = message.out === true;
+      console.log(`🔄 Type: ${isWithdraw ? 'WITHDRAW' : 'DÉPÔT'}`);
+      console.log('========================\n');
       
       if (isWithdraw) {
         // WITHDRAW : @WxyzCrypto envoie un gift → RETIRER de l'inventaire
@@ -475,25 +454,20 @@ class TelegramGiftDetector {
     }
   }
 
-  // Extraire les informations du gift
+  // Extraire les informations du gift (UNIQUEMENT l'essentiel)
   extractGiftInfo(message) {
     try {
       if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
         const gift = message.action.gift;
         
         if (gift) {
-          // Extraire le nom du gift
+          // 🎯 INFORMATIONS ESSENTIELLES SEULEMENT :
           const giftName = gift.title || 'Unknown Gift';
-          
-          // Extraire le slug du collectible
           const collectibleId = gift.slug || `gift-${message.id}`;
-          
-          // Extraire le coût en stars
           const giftValue = gift.num || 25;
           
-          // Extraire les attributs
+          // Traitement des attributs (Model, Backdrop, Symbol)
           const attributes = gift.attributes || [];
-          
           let collectibleModel = 'Unknown';
           let collectibleBackdrop = 'Unknown';
           let collectibleSymbol = 'Unknown';
@@ -505,14 +479,12 @@ class TelegramGiftDetector {
           }
           
           return {
-            giftName,
-            giftValue,
-            giftType: 'star_gift_unique',
-            mediaType: 'star_gift_unique',
-            collectibleId,
-            collectibleModel,
-            collectibleBackdrop,
-            collectibleSymbol
+            giftName,           // Nom du gift
+            collectibleId,      // ID du collectible
+            giftValue,          // Valeur en stars
+            collectibleModel,   // Model (ex: "Gold Star 1%")
+            collectibleBackdrop, // Backdrop (ex: "Copper 2%")
+            collectibleSymbol   // Symbol (ex: "Genie Lamp 0.4%")
           };
         }
       }
