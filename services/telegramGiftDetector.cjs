@@ -390,7 +390,7 @@ class TelegramGiftDetector {
       
       if (isWithdraw) {
         // WITHDRAW : @WxyzCrypto envoie un gift → RETIRER de l'inventaire
-        console.log(`🔄 WITHDRAW détecté: ${giftInfo.giftName} envoyé par @${senderUsername}`);
+        console.log(`🔄 WITHDRAW détecté: ${giftInfo.giftName} envoyé par @WxyzCrypto`);
         
         // Récupérer le destinataire depuis la conversation
         const recipientUsername = this.extractRecipientFromConversation(message);
