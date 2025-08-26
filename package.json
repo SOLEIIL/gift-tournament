@@ -10,12 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.56.0",
     "@twa-dev/sdk": "^7.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "lucide-react": "^0.294.0",
+    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.0.0"
@@ -36,7 +38,7 @@
     "vite": "^4.5.0"
   },
   "optionalDependencies": {
-    "telegram": "^2.19.10",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.6.1",
+    "telegram": "^2.26.22"
   }
 }
