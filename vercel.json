@@ -1,40 +1,8 @@
 {
   "version": 2,
   "functions": {
-    "api/inventory-webhook.js": {
-      "maxDuration": 30
-    },
-    "api/user-inventory.js": {
-      "maxDuration": 30
-    },
-    "api/deposit-webhook.js": {
+    "api/*.js": {
       "maxDuration": 30
     }
-  },
-  "builds": [],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "ALLOWALL"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://web.telegram.org https://t.me;"
-        }
-      ]
-    }
-  ]
+  }
 }
