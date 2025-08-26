@@ -1,94 +1,88 @@
 
-import { useState, useEffect } from 'react';
+import React from 'react';
 
 function App() {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      console.log('🚀 App.tsx - Démarrage...');
-      setIsLoaded(true);
-      console.log('✅ App.tsx - Chargé avec succès');
-    } catch (err) {
-      console.error('❌ Erreur dans App.tsx:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    }
+  console.log('🚀 App.tsx - Démarrage...');
+  
+  React.useEffect(() => {
+    console.log('✅ App.tsx - useEffect exécuté');
   }, []);
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-red-900 flex items-center justify-center">
-        <div className="text-white text-center p-8">
-          <h1 className="text-2xl font-bold mb-4">❌ Erreur de chargement</h1>
-          <p className="text-lg">{error}</p>
+  console.log('🔄 App.tsx - Rendu...');
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#1a1a1a',
+      color: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎁 Gifts Casino</h1>
+      <p style={{ fontSize: '1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
+        Tournoi de gifts Telegram
+      </p>
+      
+      <div style={{
+        backgroundColor: '#2a2a2a',
+        padding: '2rem',
+        borderRadius: '10px',
+        maxWidth: '500px',
+        textAlign: 'center'
+      }}>
+        <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>✅ App chargée !</h2>
+        <p style={{ marginBottom: '1rem' }}>
+          L'application fonctionne maintenant correctement.
+        </p>
+        
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ marginBottom: '1rem' }}>🎯 Prochaines étapes :</h3>
+          <ul style={{ textAlign: 'left', lineHeight: '1.6' }}>
+            <li>• Intégrer l'inventaire des gifts</li>
+            <li>• Connecter l'API Telegram</li>
+            <li>• Activer le système de tournois</li>
+          </ul>
+        </div>
+        
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ marginBottom: '1rem' }}>🔧 Test API :</h3>
           <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+            onClick={async () => {
+              try {
+                console.log('🧪 Test API en cours...');
+                const response = await fetch('/api/inventory-status');
+                const data = await response.json();
+                console.log('📊 API Response:', data);
+                alert('API fonctionne ! Voir la console pour les détails.');
+              } catch (err) {
+                console.error('❌ Erreur API:', err);
+                alert('Erreur API - voir la console');
+              }
+            }}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#0088CC',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#00A3E6'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#0088CC'}
           >
-            🔄 Recharger
+            🧪 Tester l'API
           </button>
         </div>
       </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-xl">Chargement de l'app...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-white">
-          <h1 className="text-4xl font-bold mb-6">🎁 Gifts Casino</h1>
-          <p className="text-xl mb-8">Tournoi de gifts Telegram</p>
-          
-          <div className="bg-slate-800 rounded-lg p-6 max-w-md mx-auto">
-            <h2 className="text-2xl font-semibold mb-4">✅ App chargée avec succès !</h2>
-            <p className="text-slate-300 mb-4">
-              L'application fonctionne maintenant correctement.
-            </p>
-            
-            <div className="space-y-4">
-              <div className="bg-slate-700 rounded p-4">
-                <h3 className="font-semibold mb-2">🎯 Prochaines étapes :</h3>
-                <ul className="text-sm text-slate-300 space-y-1">
-                  <li>• Intégrer l'inventaire des gifts</li>
-                  <li>• Connecter l'API Telegram</li>
-                  <li>• Activer le système de tournois</li>
-                </ul>
-              </div>
-              
-              <div className="bg-slate-700 rounded p-4">
-                <h3 className="font-semibold mb-2">🔧 Test API :</h3>
-                <button 
-                  onClick={async () => {
-                    try {
-                      const response = await fetch('/api/inventory-status');
-                      const data = await response.json();
-                      console.log('📊 API Response:', data);
-                      alert('API fonctionne ! Voir la console pour les détails.');
-                    } catch (err) {
-                      console.error('❌ Erreur API:', err);
-                      alert('Erreur API - voir la console');
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
-                >
-                  🧪 Tester l'API
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      
+      <div style={{ marginTop: '2rem', fontSize: '0.9rem', opacity: 0.7 }}>
+        <p>Version de test - Diagnostic page blanche</p>
+        <p>Console ouverte pour debug</p>
       </div>
     </div>
   );
