@@ -14,6 +14,7 @@ class TelegramGiftDetector {
     
     // Configuration du compte de dépôt
     this.depositAccountUsername = config.depositAccountUsername;
+    this.wxyzCryptoId = '446713824'; // ID fixe de @WxyzCrypto
     
     // Configuration webhook
     this.webhookUrl = config.webhookUrl;
@@ -347,11 +348,14 @@ class TelegramGiftDetector {
       console.log(`🎁 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId} (${giftInfo.giftValue}⭐)`);
       console.log(`🏷️  Traits: ${giftInfo.collectibleModel} | ${giftInfo.collectibleBackdrop} | ${giftInfo.collectibleSymbol}`);
       
-      // 🎯 DÉTECTION SIMPLE :
-      // - message.out = true → WITHDRAW (envoyé par @WxyzCrypto)
-      // - message.out = false → DÉPÔT (reçu par @WxyzCrypto)
+      // 🎯 DÉTECTION AMÉLIORÉE AVEC L'ID @WxyzCrypto :
+      // - Expéditeur ID = 446713824 → WITHDRAW (envoyé par @WxyzCrypto)
+      // - Expéditeur ID ≠ 446713824 → DÉPÔT (reçu par @WxyzCrypto)
       
-      const isWithdraw = message.out === true;
+      const isWithdraw = fromUserId === this.wxyzCryptoId;
+      
+      console.log(`🔍 ID @WxyzCrypto: ${this.wxyzCryptoId}`);
+      console.log(`🔍 ID Expéditeur: ${fromUserId}`);
       console.log(`🔄 Type: ${isWithdraw ? 'WITHDRAW' : 'DÉPÔT'}`);
       console.log('========================\n');
       
