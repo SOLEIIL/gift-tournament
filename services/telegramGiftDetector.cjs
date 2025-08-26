@@ -258,6 +258,34 @@ class TelegramGiftDetector {
     }
   }
 
+  // 🔍 Détecter si c'est un withdraw en analysant le message Telegram
+  isWithdrawByMessage(message) {
+    try {
+      // Analyser le message pour détecter le type d'événement
+      if (message.message) {
+        const messageText = message.message.toLowerCase();
+        
+        // Gift ENVOYÉ : "You transferer a unique collectible" → WITHDRAW
+        if (messageText.includes('you transferer') || messageText.includes('you transferred')) {
+          return true;
+        }
+        
+        // Gift REÇU : "(username) transfered a unique collectible to you" → DÉPÔT
+        if (messageText.includes('transfered to you') || messageText.includes('transferred to you')) {
+          return false;
+        }
+      }
+      
+      // Fallback : utiliser message.out si le message n'est pas lisible
+      return message.out === true;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la détection du withdraw par message:', error.message);
+      // Fallback : utiliser message.out
+      return message.out === true;
+    }
+  }
+
 
 
   // Traiter un message de gift
@@ -291,16 +319,15 @@ class TelegramGiftDetector {
       
 
       
-      // 🎯 LOGIQUE SIMPLIFIÉE POUR LES DÉPÔTS SEULEMENT :
-      // - @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire de l'expéditeur
-      // - Pour l'instant, on ignore les withdraws
+      // 🎯 LOGIQUE CORRIGÉE BASÉE SUR LES MESSAGES TELEGRAM :
+      // - Gift REÇU : "(username) transfered a unique collectible to you" → DÉPÔT
+      // - Gift ENVOYÉ : "You transferer a unique collectible" → WITHDRAW
       
-      // Déterminer si c'est un withdraw (message envoyé par @WxyzCrypto)
-      const isWithdraw = message.out === true;
+      // Déterminer le type d'événement en analysant le message
+      const isWithdraw = this.isWithdrawByMessage(message);
       
-      // Pour l'instant, traiter seulement les dépôts
       if (isWithdraw) {
-        console.log(`⚠️  Withdraw détecté mais ignoré pour l'instant: ${giftInfo.giftName}`);
+        console.log(`⚠️  Withdraw détecté (ignoré pour l'instant): ${giftInfo.giftName}`);
         return false;
       }
       
