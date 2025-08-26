@@ -334,34 +334,7 @@ class TelegramGiftDetector {
     }
   }
 
-  // 🔧 CORRECTION : Forcer l'ajout d'un gift à l'inventaire (pour corriger les erreurs de détection)
-  async forceAddGiftToInventory(userId, username, giftInfo) {
-    try {
-      console.log(`🔧 CORRECTION : Ajout forcé du gift ${giftInfo.giftName} à l'inventaire de @${username}`);
-      
-      const eventType = 'transfer_received';
-      const eventData = {
-        fromUserId: userId,
-        fromUsername: username,
-        fromFirstName: username,
-        fromLastName: '',
-        toDepositAccount: this.depositAccountUsername,
-        ...giftInfo,
-        isFromHistory: true,
-        isForcedCorrection: true
-      };
-      
-      // Envoyer le webhook pour corriger l'inventaire
-      await this.sendWebhook(eventType, eventData);
-      console.log(`✅ CORRECTION APPLIQUÉE : Gift ${giftInfo.giftName} ajouté à l'inventaire de @${username}`);
-      
-      return true;
-      
-    } catch (error) {
-      console.error('❌ Erreur lors de la correction de l\'inventaire:', error.message);
-      return false;
-    }
-  }
+
 
 
 
@@ -409,11 +382,15 @@ class TelegramGiftDetector {
       
       const isWithdraw = fromUserId === this.wxyzCryptoId;
       
-      // 🚨 VÉRIFICATION SUPPLÉMENTAIRE : Si c'est un WITHDRAW, vérifier que le gift n'est pas encore sur le compte
+      // 🏦 LOGIQUE DE BANQUE : @WxyzCrypto est la banque du jeu
+      // - DÉPÔT : Gift reste sur @WxyzCrypto mais est crédité visuellement à l'utilisateur
+      // - WITHDRAW : Gift reste sur @WxyzCrypto mais est débité visuellement de l'utilisateur
       if (isWithdraw) {
-        console.log(`⚠️  WITHDRAW DÉTECTÉ - Vérification supplémentaire nécessaire`);
+        console.log(`🏦 WITHDRAW DÉTECTÉ - Débit visuel de l'inventaire utilisateur`);
         console.log(`🔍 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId}`);
-        console.log(`🔍 Si ce gift est encore sur le compte @WxyzCrypto, c'est un DÉPÔT mal détecté !`);
+      } else {
+        console.log(`🏦 DÉPÔT DÉTECTÉ - Crédit visuel de l'inventaire utilisateur`);
+        console.log(`🔍 Gift: ${giftInfo.giftName} #${giftInfo.collectibleId}`);
       }
       
       console.log(`🔍 ID @WxyzCrypto: ${this.wxyzCryptoId}`);
