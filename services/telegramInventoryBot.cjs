@@ -1,6 +1,6 @@
 // services/telegramInventoryBot.js
 const crypto = require('crypto');
-const InventoryManager = require('./inventoryManager');
+const InventoryManager = require('./inventoryManager.cjs');
 
 class TelegramInventoryBot {
   constructor(config) {

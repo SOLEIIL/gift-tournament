@@ -29,6 +29,11 @@ class TelegramGiftDetector {
     this.pollingInterval = null;
     this.lastMessageIds = new Map();
     
+    // 🔒 SYSTÈME DE DÉDUPLICATION DES GIFTS
+    this.processedGifts = new Map(); // Map pour éviter les doublons
+    this.giftDeduplicationKey = (giftName, collectibleId, fromUserId) => 
+      `${giftName}-${collectibleId}-${fromUserId}`;
+    
     // Validation de la configuration
     this.validateConfig();
   }
@@ -111,13 +116,14 @@ class TelegramGiftDetector {
       const dialogs = await this.client.getDialogs();
       let giftsFound = 0;
       let nativeGiftsFound = 0;
+      let processedGifts = new Set(); // Pour éviter les doublons dans l'historique
       
       console.log('🔍 Recherche des VRAIS gifts Telegram dans l\'historique...');
       
       for (const dialog of dialogs) {
         if (dialog.entity && dialog.entity.className === 'User') {
           const chatId = dialog.entity.id.toString();
-          console.log(`📱 Vérification du chat avec: ${dialog.entity.username || dialog.entity.firstName || 'Unknown'}`);
+          const username = dialog.entity.username || dialog.entity.firstName || 'Unknown';
           
           try {
             const messages = await this.client.getMessages(dialog.entity, { limit: 50 });
@@ -130,13 +136,24 @@ class TelegramGiftDetector {
             for (const message of messages) {
               // 🎯 UNIQUEMENT : Détecter les vrais gifts Telegram
               if (this.isRealTelegramGift(message)) {
-                console.log('🎁 VRAI GIFT TELEGRAM DÉTECTÉ dans l\'historique !');
-                nativeGiftsFound++;
-                
-                // Traiter le gift
-                const success = await this.processGiftMessage(message, true);
-                if (!success) {
-                  console.log('⚠️  Gift non traité (erreur)');
+                // Extraire les infos du gift pour la déduplication
+                const giftInfo = this.extractGiftInfo(message);
+                if (giftInfo) {
+                  const dedupKey = this.giftDeduplicationKey(giftInfo.giftName, giftInfo.collectibleId, this.extractSenderId(message));
+                  
+                  // Traiter seulement si pas déjà vu
+                  if (!processedGifts.has(dedupKey)) {
+                    processedGifts.add(dedupKey);
+                    nativeGiftsFound++;
+                    
+                    console.log(`🎁 Gift historique: ${giftInfo.giftName} de @${username}`);
+                    
+                    // Traiter le gift
+                    const success = await this.processGiftMessage(message, true);
+                    if (!success) {
+                      console.log('⚠️  Gift non traité (erreur)');
+                    }
+                  }
                 }
               }
             }
@@ -146,7 +163,7 @@ class TelegramGiftDetector {
         }
       }
       
-      console.log(`✅ Scan terminé: ${nativeGiftsFound} vrais gifts Telegram trouvés`);
+      console.log(`✅ Scan terminé: ${nativeGiftsFound} gifts uniques trouvés`);
       
     } catch (error) {
       console.error('❌ Erreur lors du scan de l\'historique:', error.message);
@@ -244,19 +261,36 @@ class TelegramGiftDetector {
   // Traiter un message de gift
   async processGiftMessage(message, isFromHistory = false) {
     try {
-      console.log('🎁 Traitement du gift...');
-      
       // Extraire les informations du gift
       const giftInfo = this.extractGiftInfo(message);
       if (!giftInfo) {
-        console.log('❌ Impossible d\'extraire les informations du gift');
         return false;
+      }
+      
+      // 🔒 VÉRIFICATION DE DÉDUPLICATION
+      const fromUserId = this.extractSenderId(message);
+      const dedupKey = this.giftDeduplicationKey(giftInfo.giftName, giftInfo.collectibleId, fromUserId);
+      
+      // Vérifier si ce gift a déjà été traité récemment
+      if (this.processedGifts.has(dedupKey)) {
+        const lastProcessed = this.processedGifts.get(dedupKey);
+        const timeDiff = Date.now() - lastProcessed.timestamp;
+        
+        // Si le gift a été traité il y a moins de 5 minutes, l'ignorer silencieusement
+        if (timeDiff < 5 * 60 * 1000) {
+          return false;
+        }
+        
+        // Si c'est le même message, l'ignorer complètement
+        if (lastProcessed.messageId === message.id) {
+          return false;
+        }
       }
       
       // Déterminer le type d'événement
       let eventType = 'transfer_received';
       let eventData = {
-        fromUserId: this.extractSenderId(message),
+        fromUserId: fromUserId,
         fromUsername: this.extractSenderUsername(message),
         fromFirstName: this.extractSenderFirstName(message),
         fromLastName: this.extractSenderLastName(message),
@@ -279,10 +313,29 @@ class TelegramGiftDetector {
         };
       }
       
+      // 🔒 MARQUER CE GIFT COMME TRAITÉ
+      this.processedGifts.set(dedupKey, {
+        timestamp: Date.now(),
+        messageId: message.id,
+        eventType: eventType,
+        giftName: giftInfo.giftName
+      });
+      
+      // Nettoyer les anciens gifts (garder seulement les 1000 plus récents)
+      if (this.processedGifts.size > 1000) {
+        const entries = Array.from(this.processedGifts.entries());
+        entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+        this.processedGifts = new Map(entries.slice(0, 1000));
+      }
+      
       // Envoyer le webhook
       await this.sendWebhook(eventType, eventData);
       
-      console.log('✅ Gift traité avec succès !');
+      // Afficher seulement le résumé de l'action
+      const action = eventType === 'transfer_received' ? 'AJOUTÉ' : 'RETIRÉ';
+      const username = eventType === 'transfer_received' ? eventData.fromUsername : eventData.toUsername;
+      console.log(`✅ ${action} à l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${username}`);
+      
       return true;
       
     } catch (error) {
@@ -294,28 +347,20 @@ class TelegramGiftDetector {
   // Extraire les informations du gift
   extractGiftInfo(message) {
     try {
-      console.log('🔍 Extraction des informations du gift...');
-      
       if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
         const gift = message.action.gift;
         
         if (gift) {
-          console.log('🎁 Extraction des métadonnées du gift natif Telegram...');
-          
           // Extraire le nom du gift
           const giftName = gift.title || 'Unknown Gift';
-          console.log(`✅ Nom du gift: ${giftName}`);
           
           // Extraire le slug du collectible
           const collectibleId = gift.slug || `gift-${message.id}`;
-          console.log(`✅ Slug du collectible: ${collectibleId}`);
           
           // Extraire le coût en stars
           const giftValue = gift.num || 25;
-          console.log(`✅ Coût en stars: ${giftValue}`);
           
           // Extraire les attributs
-          console.log('🔍 Extraction des attributs du gift...');
           const attributes = gift.attributes || [];
           
           let collectibleModel = 'Unknown';
@@ -327,23 +372,6 @@ class TelegramGiftDetector {
             if (attr.key === 'backdrop') collectibleBackdrop = attr.value;
             if (attr.key === 'symbol') collectibleSymbol = attr.value;
           }
-          
-          console.log(`✅ Modèle: ${collectibleModel}`);
-          console.log(`✅ Symbole: ${collectibleSymbol}`);
-          console.log(`✅ Backdrop: ${collectibleBackdrop}`);
-          
-          console.log('✅ Métadonnées du gift natif extraites avec succès:', {
-            giftName,
-            giftValue,
-            giftType: 'star_gift_unique',
-            mediaType: 'star_gift_unique',
-            fromUserId: this.extractSenderId(message),
-            fromUsername: this.extractSenderUsername(message),
-            collectibleId,
-            collectibleModel,
-            collectibleBackdrop,
-            collectibleSymbol
-          });
           
           return {
             giftName,
@@ -358,7 +386,6 @@ class TelegramGiftDetector {
         }
       }
       
-      console.log('⚠️  Impossible d\'extraire les informations du gift');
       return null;
       
     } catch (error) {
