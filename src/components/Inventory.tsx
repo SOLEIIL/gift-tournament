@@ -69,9 +69,9 @@ export const Inventory: React.FC<InventoryProps> = ({
   useEffect(() => {
     loadInventory();
     
-    // Recharger toutes les 3 secondes pour les mises à jour en temps réel
-    const interval = setInterval(loadInventory, 3000);
-    return () => clearInterval(interval);
+    // PAS DE REFRESH AUTOMATIQUE - SEULEMENT AU MONTAGE
+    // const interval = setInterval(loadInventory, 3000);
+    // return () => clearInterval(interval);
   }, []);
 
   if (loading) {
