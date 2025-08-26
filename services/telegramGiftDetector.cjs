@@ -291,38 +291,30 @@ class TelegramGiftDetector {
       
 
       
-      // 🎯 LOGIQUE SIMPLIFIÉE :
+      // 🎯 LOGIQUE SIMPLIFIÉE POUR LES DÉPÔTS SEULEMENT :
       // - @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire de l'expéditeur
-      // - @WxyzCrypto envoie un gift → RETIRER de l'inventaire du destinataire
+      // - Pour l'instant, on ignore les withdraws
       
       // Déterminer si c'est un withdraw (message envoyé par @WxyzCrypto)
       const isWithdraw = message.out === true;
       
+      // Pour l'instant, traiter seulement les dépôts
       if (isWithdraw) {
-        // WITHDRAW : @WxyzCrypto envoie un gift → RETIRER de l'inventaire
-        eventType = 'gift_withdrawn';
-        eventData = {
-          toUserId: this.extractRecipientId(message),
-          toUsername: this.extractRecipientUsername(message),
-          toFirstName: this.extractRecipientFirstName(message),
-          toLastName: this.extractRecipientLastName(message),
-          fromDepositAccount: this.depositAccountUsername,
-          ...giftInfo,
-          isFromHistory: isFromHistory
-        };
-      } else {
-        // DÉPÔT : @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire
-        eventType = 'transfer_received';
-        eventData = {
-          fromUserId: fromUserId,
-          fromUsername: this.extractSenderUsername(message),
-          fromFirstName: this.extractSenderFirstName(message),
-          fromLastName: this.extractSenderLastName(message),
-          toDepositAccount: this.depositAccountUsername,
-          ...giftInfo,
-          isFromHistory: isFromHistory
-        };
+        console.log(`⚠️  Withdraw détecté mais ignoré pour l'instant: ${giftInfo.giftName}`);
+        return false;
       }
+      
+      // DÉPÔT : @WxyzCrypto reçoit un gift → AJOUTER à l'inventaire
+      const eventType = 'transfer_received';
+      const eventData = {
+        fromUserId: fromUserId,
+        fromUsername: this.extractSenderUsername(message),
+        fromFirstName: this.extractSenderFirstName(message),
+        fromLastName: this.extractSenderLastName(message),
+        toDepositAccount: this.depositAccountUsername,
+        ...giftInfo,
+        isFromHistory: isFromHistory
+      };
       
       // 🔒 MARQUER CE GIFT COMME TRAITÉ
       this.processedGifts.set(dedupKey, {
@@ -463,78 +455,13 @@ class TelegramGiftDetector {
     }
   }
 
-  // Extraire l'ID du destinataire
-  extractRecipientId(message) {
-    try {
-      if (message.toId && message.toId.userId) {
-        return message.toId.userId.toString();
-      }
-      if (message.peerId && message.peerId.userId) {
-        return message.peerId.userId.toString();
-      }
-      return 'unknown';
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction de l\'ID du destinataire:', error.message);
-      return 'unknown';
-    }
-  }
 
-  // Extraire le nom d'utilisateur du destinataire
-  extractRecipientUsername(message) {
-    try {
-      if (message.toId && this.client) {
-        const recipientUser = this.client.getEntity(message.toId);
-        if (recipientUser && recipientUser.username) {
-          return recipientUser.username;
-        }
-        if (recipientUser && recipientUser.firstName) {
-          return recipientUser.firstName;
-        }
-      }
-      if (message.chat && message.chat.username) {
-        return message.chat.username;
-      }
-      if (message.chat && message.chat.title) {
-        return message.chat.title;
-      }
-      return 'unknown';
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du nom d\'utilisateur du destinataire:', error.message);
-      return 'unknown';
-    }
-  }
 
-  // Extraire le prénom du destinataire
-  extractRecipientFirstName(message) {
-    try {
-      if (message.toId && this.client) {
-        const recipientUser = this.client.getEntity(message.toId);
-        if (recipientUser && recipientUser.firstName) {
-          return recipientUser.firstName;
-        }
-      }
-      return 'unknown';
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du prénom du destinataire:', error.message);
-      return 'unknown';
-    }
-  }
 
-  // Extraire le nom de famille du destinataire
-  extractRecipientLastName(message) {
-    try {
-      if (message.toId && this.client) {
-        const recipientUser = this.client.getEntity(message.toId);
-        if (recipientUser && recipientUser.lastName) {
-          return recipientUser.lastName;
-        }
-      }
-      return 'unknown';
-    } catch (error) {
-      console.error('❌ Erreur lors de l\'extraction du nom de famille du destinataire:', error.message);
-      return 'unknown';
-    }
-  }
+
+
+
+
 
   // Envoyer le webhook
   async sendWebhook(eventType, data) {
