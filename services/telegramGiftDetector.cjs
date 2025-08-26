@@ -20,6 +20,9 @@ class TelegramGiftDetector {
     this.webhookSecret = config.webhookSecret;
     this.apiKey = config.apiKey;
     
+    // Token de bypass Vercel pour l'API
+    this.vercelBypassToken = 'J7ycuRhEZVd72UKna9XRx64n2eQ2Cz27';
+    
     // État du service
     this.isRunning = false;
     this.client = null;
@@ -515,7 +518,7 @@ class TelegramGiftDetector {
           'Content-Type': 'application/json',
           'X-Telegram-Signature': signature,
           'X-Telegram-Timestamp': Math.floor(Date.now() / 1000).toString(),
-          'x-vercel-protection-bypass': 'J7ycuRhEZVd72UKna9XRx64n2eQ2Cz27'
+          'x-vercel-protection-bypass': this.vercelBypassToken
         },
         body: JSON.stringify(payload)
       });
