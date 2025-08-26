@@ -269,34 +269,34 @@ class TelegramGiftDetector {
         toId: message.toId
       });
       
-      // Pour un withdraw, le destinataire est dans le chat/peer
-      if (message.peerId) {
-        console.log(`🔍 peerId trouvé:`, message.peerId);
+      // 🎯 NOUVELLE SOLUTION : Utiliser message.chat pour récupérer username et ID
+      if (message.chat && message.chat.className === 'User') {
+        console.log(`🔍 Chat utilisateur trouvé:`, message.chat);
         
-        // Si c'est un chat privé, le destinataire est l'utilisateur
-        if (message.peerId.className === 'PeerUser') {
-          const userId = message.peerId.userId.toString();
-          console.log(`🔍 Chat privé avec utilisateur ID: ${userId}`);
-          
-          // 🎯 SOLUTION SIMPLE : Utiliser l'ID directement
-          // D'après Stack Overflow, on ne peut pas récupérer le username par ID sans chat préalable
-          // Donc on utilise l'ID comme identifiant unique
-          
-          console.log(`🔍 Utilisation de l'ID utilisateur directement: ${userId}`);
+        // Extraire l'ID (sans le 'n' à la fin)
+        const userId = message.chat.id.value.toString();
+        const username = message.chat.username;
+        
+        console.log(`🔍 ID utilisateur extrait: ${userId}`);
+        console.log(`🔍 Username extrait: @${username}`);
+        
+        // Retourner le username si disponible, sinon l'ID
+        if (username) {
+          return username;
+        } else {
           return userId;
-        }
-        
-        // Si c'est un chat de groupe, essayer d'extraire depuis le message
-        if (message.peerId.className === 'PeerChat' || message.peerId.className === 'PeerChannel') {
-          console.log(`🔍 Chat de groupe/canal: ${message.peerId.className}`);
-          return 'group_chat';
         }
       }
       
-      // Fallback : utiliser le nom du chat si disponible
-      if (message.chat && message.chat.title) {
-        console.log(`🔍 Fallback chat title: ${message.chat.title}`);
-        return message.chat.title;
+      // Fallback : utiliser peerId si chat n'est pas disponible
+      if (message.peerId) {
+        console.log(`🔍 Fallback peerId:`, message.peerId);
+        
+        if (message.peerId.className === 'PeerUser') {
+          const userId = message.peerId.userId.toString();
+          console.log(`🔍 Fallback ID utilisateur: ${userId}`);
+          return userId;
+        }
       }
       
       console.log(`🔍 Aucun destinataire trouvé`);
@@ -364,12 +364,12 @@ class TelegramGiftDetector {
         console.log(`🔄 WITHDRAW détecté: ${giftInfo.giftName} envoyé par @WxyzCrypto`);
         
         // Récupérer le destinataire depuis la conversation
-        const recipientId = this.extractRecipientFromConversation(message);
-        console.log(`👤 Destinataire détecté: ID ${recipientId}`);
+        const recipientUsername = this.extractRecipientFromConversation(message);
+        console.log(`👤 Destinataire détecté: @${recipientUsername}`);
         
         const eventType = 'gift_withdrawn';
         const eventData = {
-          toUserId: recipientId,
+          toUsername: recipientUsername,
           fromDepositAccount: this.depositAccountUsername,
           ...giftInfo,
           isFromHistory: isFromHistory
@@ -377,7 +377,7 @@ class TelegramGiftDetector {
         
         // Envoyer le webhook
         await this.sendWebhook(eventType, eventData);
-        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de l'utilisateur ${recipientId}`);
+        console.log(`✅ RETIRÉ de l'inventaire: ${giftInfo.giftName} (${giftInfo.giftValue}⭐) de @${recipientUsername}`);
         
         return true;
       }
