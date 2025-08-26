@@ -1,28 +1,36 @@
-// api/inventory-webhook-simple.js
-// Version simplifiée de l'API d'inventaire
+// api/inventory-webhook.js
+// Version ultra-simplifiée sans aucune dépendance
 
 export default function handler(req, res) {
   try {
-    console.log('🎁 inventory-webhook-simple appelée');
+    console.log('🎁 INVENTORY-WEBHOOK V2 - Version ultra-simplifiée');
     console.log('📊 Méthode:', req.method);
-    console.log('📋 Headers:', Object.keys(req.headers));
-    console.log('📄 Body:', req.body ? 'Présent' : 'Absent');
+    console.log('📋 Headers reçus:', Object.keys(req.headers));
+    console.log('📄 Body présent:', !!req.body);
     
     if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Méthode non autorisée' });
+      return res.status(405).json({ 
+        error: 'Méthode non autorisée',
+        version: 'V2-ultra-simple',
+        timestamp: new Date().toISOString()
+      });
     }
 
-    // Vérification simple de la signature
+    // Vérification basique des headers
     const signature = req.headers['x-telegram-signature'];
     const timestamp = req.headers['x-telegram-timestamp'];
     
     if (!signature || !timestamp) {
-      console.log('❌ Headers manquants');
-      return res.status(401).json({ error: 'Headers manquants' });
+      console.log('❌ Headers manquants - signature ou timestamp');
+      return res.status(401).json({ 
+        error: 'Headers manquants',
+        version: 'V2-ultra-simple',
+        required: ['x-telegram-signature', 'x-telegram-timestamp']
+      });
     }
 
-    console.log('✅ Headers reçus');
-    console.log('📊 Données reçues:', req.body);
+    console.log('✅ Headers validés');
+    console.log('📊 Données reçues:', JSON.stringify(req.body, null, 2));
 
     // Traitement des événements
     const { event, data } = req.body;
@@ -39,15 +47,17 @@ export default function handler(req, res) {
         collectibleId: data.collectibleId,
         giftValue: data.giftValue,
         timestamp: new Date().toISOString(),
-        status: 'success'
+        status: 'success',
+        version: 'V2-ultra-simple'
       };
       
       console.log('📊 Mise à jour inventaire:', inventoryUpdate);
       
       return res.status(200).json({
         success: true,
-        message: 'Gift ajouté à l\'inventaire',
-        inventoryUpdate
+        message: 'Gift ajouté à l\'inventaire - V2',
+        inventoryUpdate,
+        version: 'V2-ultra-simple'
       });
       
     } else if (event === 'gift_withdrawn') {
@@ -62,27 +72,36 @@ export default function handler(req, res) {
         collectibleId: data.collectibleId,
         giftValue: data.giftValue,
         timestamp: new Date().toISOString(),
-        status: 'success'
+        status: 'success',
+        version: 'V2-ultra-simple'
       };
       
       console.log('📊 Mise à jour inventaire:', inventoryUpdate);
       
       return res.status(200).json({
         success: true,
-        message: 'Gift retiré de l\'inventaire',
-        inventoryUpdate
+        message: 'Gift retiré de l\'inventaire - V2',
+        inventoryUpdate,
+        version: 'V2-ultra-simple'
       });
       
     } else {
       console.log('❌ Événement non reconnu:', event);
-      return res.status(400).json({ error: 'Événement non reconnu' });
+      return res.status(400).json({ 
+        error: 'Événement non reconnu',
+        version: 'V2-ultra-simple',
+        receivedEvent: event,
+        supportedEvents: ['transfer_received', 'gift_withdrawn']
+      });
     }
     
   } catch (error) {
-    console.error('❌ Erreur dans inventory-webhook-simple:', error);
+    console.error('❌ Erreur dans inventory-webhook V2:', error);
     res.status(500).json({
-      error: 'Erreur interne',
-      message: error.message
+      error: 'Erreur interne V2',
+      message: error.message,
+      version: 'V2-ultra-simple',
+      timestamp: new Date().toISOString()
     });
   }
 }
