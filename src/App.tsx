@@ -31,16 +31,9 @@ function App() {
     if (currentPage !== 'pvp') {
       switch (currentPage) {
         case 'inventory':
-          // Get current player's gifts and total TON value
-          const currentPlayer = state.players[0]; // Mock: always use first player
-          const userGifts = currentPlayer.nfts || [];
-          const totalTON = userGifts.reduce((sum, nft) => sum + nft.value, 0);
-          
           return <Inventory 
             onPageChange={setCurrentPage} 
             currentPage={currentPage}
-            userGifts={userGifts}
-            totalTON={totalTON}
           />;
         case 'rolls':
           return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
