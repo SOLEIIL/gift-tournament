@@ -514,7 +514,8 @@ class TelegramGiftDetector {
         headers: {
           'Content-Type': 'application/json',
           'X-Telegram-Signature': signature,
-          'X-Telegram-Timestamp': Math.floor(Date.now() / 1000).toString()
+          'X-Telegram-Timestamp': Math.floor(Date.now() / 1000).toString(),
+          'x-vercel-protection-bypass': 'J7ycuRhEZVd72UKna9XRx64n2eQ2Cz27'
         },
         body: JSON.stringify(payload)
       });
