@@ -1,5 +1,5 @@
 // api/inventory-webhook.js
-import { InventoryManager } from '../../lib/supabase.js';
+const { InventoryManager } = require('../../lib/supabase.js');
 
 // Configuration sécurisée
 const INVENTORY_CONFIG = {
@@ -202,7 +202,7 @@ const handleGiftWithdrawn = async (giftData) => {
 };
 
 // API endpoint principal
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Vérifier la méthode HTTP
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
