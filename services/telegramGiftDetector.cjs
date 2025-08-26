@@ -261,29 +261,15 @@ class TelegramGiftDetector {
   // 🔍 Détecter si c'est un message de withdraw
   isWithdrawMessage(message) {
     try {
-      // Un withdraw = message envoyé PAR @WxyzCrypto VERS un utilisateur
-      // Vérifier si l'expéditeur est @WxyzCrypto
+      // 🎯 LOGIQUE CORRIGÉE :
+      // - DÉPÔT = Gift reçu PAR @WxyzCrypto DEPUIS un utilisateur (message.out = false)
+      // - WITHDRAW = Gift envoyé PAR @WxyzCrypto VERS un utilisateur (message.out = true)
       
-      // Méthode 1: Vérifier message.out (message envoyé par nous)
-      if (message.out === true) {
-        return true;
-      }
+      // Seule méthode fiable : message.out
+      // message.out = true → message envoyé par @WxyzCrypto → WITHDRAW
+      // message.out = false → message reçu par @WxyzCrypto → DÉPÔT
       
-      // Méthode 2: Vérifier si l'expéditeur est @WxyzCrypto
-      const senderId = this.extractSenderId(message);
-      if (senderId === 'unknown') {
-        // Si on ne peut pas identifier l'expéditeur, utiliser message.out
-        return message.out === true;
-      }
-      
-      // Méthode 3: Vérifier si c'est un message de service (gift envoyé)
-      if (message.className === 'MessageService') {
-        // Les messages de service sont souvent des withdraws
-        return true;
-      }
-      
-      // Par défaut, considérer comme un dépôt (gift reçu)
-      return false;
+      return message.out === true;
       
     } catch (error) {
       console.error('❌ Erreur lors de la détection du withdraw:', error.message);
