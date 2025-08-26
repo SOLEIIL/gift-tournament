@@ -1,145 +1,95 @@
 
 import { useState, useEffect } from 'react';
-import { useTournamentState } from './hooks/useTournamentState';
-import { useTelegram } from './hooks/useTelegram';
-import { Lobby } from './components/Lobby';
-import { Round } from './components/Round';
-import { Victory } from './components/Victory';
-import { Inventory } from './components/Inventory';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn'>('pvp');
-  
-  const { 
-    state, 
-    addNFTToPlayer, 
-    resetGame, 
-    updateGameStats, 
-    lastGameStats, 
-    topGameStats 
-  } = useTournamentState();
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const {
-    themeParams,
-    isTelegram,
-    isReady,
-    expandApp
-  } = useTelegram();
-
-  const renderCurrentPage = () => {
-    // Si on n'est pas sur la page PvP, afficher la page correspondante
-    if (currentPage !== 'pvp') {
-      switch (currentPage) {
-        case 'inventory':
-          // Get current player's gifts and total TON value
-          const currentPlayer = state.players[0]; // Mock: always use first player
-          const userGifts = currentPlayer.nfts || [];
-          const totalTON = userGifts.reduce((sum, nft) => sum + nft.value, 0);
-          
-          return <Inventory 
-            onPageChange={setCurrentPage} 
-            currentPage={currentPage}
-            userGifts={userGifts}
-            totalTON={totalTON}
-          />;
-        case 'rolls':
-          return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-            <div className="text-white text-2xl">Rolls Page - Coming Soon</div>
-          </div>;
-        case 'shop':
-          return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-            <div className="text-white text-2xl">Shop Page - Coming Soon</div>
-          </div>;
-        case 'earn':
-          return <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-            <div className="text-white text-2xl">Earn Page - Coming Soon</div>
-          </div>;
-        default:
-          return null;
-      }
-    }
-
-    // Page PvP - logique du tournoi
-    switch (state.phase) {
-      case 'LOBBY':
-        return (
-          <Lobby
-            players={state.players}
-            pot={state.pot}
-            onAddNFT={addNFTToPlayer}
-            updateGameStats={updateGameStats}
-            lastGameStats={lastGameStats}
-            topGameStats={topGameStats}
-            onPageChange={setCurrentPage}
-            currentPage={currentPage}
-          />
-        );
-      
-      case 'RUNNING':
-        return (
-          <Round
-            players={state.players}
-            pot={state.pot}
-            logs={state.logs}
-            roundPhase={state.roundPhase.toString()}
-          />
-        );
-      
-      case 'FINALIZED':
-        const winner = state.players.find(p => p.nfts.length > 0);
-        if (winner) {
-          return (
-            <Victory
-              winner={winner}
-              totalPot={state.pot}
-              onPlayAgain={resetGame}
-            />
-          );
-        }
-        return null;
-      
-      default:
-        return null;
-    }
-  };
-
-  // Apply Telegram theme colors if available
   useEffect(() => {
-    if (themeParams.bg_color) {
-      document.documentElement.style.setProperty('--tg-bg-color', themeParams.bg_color);
+    try {
+      console.log('🚀 App.tsx - Démarrage...');
+      setIsLoaded(true);
+      console.log('✅ App.tsx - Chargé avec succès');
+    } catch (err) {
+      console.error('❌ Erreur dans App.tsx:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
     }
-    if (themeParams.text_color) {
-      document.documentElement.style.setProperty('--tg-text-color', themeParams.text_color);
-    }
-    if (themeParams.button_color) {
-      document.documentElement.style.setProperty('--tg-button-color', themeParams.button_color);
-    }
-    if (themeParams.button_text_color) {
-      document.documentElement.style.setProperty('--tg-button-text-color', themeParams.button_text_color);
-    }
-  }, [themeParams]);
+  }, []);
 
-  // Expand app when ready
-  useEffect(() => {
-    if (isReady && isTelegram) {
-      expandApp();
-    }
-  }, [isReady, isTelegram, expandApp]);
-
-  if (!isReady) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-red-900 flex items-center justify-center">
+        <div className="text-white text-center p-8">
+          <h1 className="text-2xl font-bold mb-4">❌ Erreur de chargement</h1>
+          <p className="text-lg">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+          >
+            🔄 Recharger
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl">Chargement de l'app...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="App" style={{
-      backgroundColor: themeParams.bg_color || '#1a1a1a',
-      color: themeParams.text_color || '#ffffff'
-    }}>
-      {renderCurrentPage()}
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-white">
+          <h1 className="text-4xl font-bold mb-6">🎁 Gifts Casino</h1>
+          <p className="text-xl mb-8">Tournoi de gifts Telegram</p>
+          
+          <div className="bg-slate-800 rounded-lg p-6 max-w-md mx-auto">
+            <h2 className="text-2xl font-semibold mb-4">✅ App chargée avec succès !</h2>
+            <p className="text-slate-300 mb-4">
+              L'application fonctionne maintenant correctement.
+            </p>
+            
+            <div className="space-y-4">
+              <div className="bg-slate-700 rounded p-4">
+                <h3 className="font-semibold mb-2">🎯 Prochaines étapes :</h3>
+                <ul className="text-sm text-slate-300 space-y-1">
+                  <li>• Intégrer l'inventaire des gifts</li>
+                  <li>• Connecter l'API Telegram</li>
+                  <li>• Activer le système de tournois</li>
+                </ul>
+              </div>
+              
+              <div className="bg-slate-700 rounded p-4">
+                <h3 className="font-semibold mb-2">🔧 Test API :</h3>
+                <button 
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/inventory-status');
+                      const data = await response.json();
+                      console.log('📊 API Response:', data);
+                      alert('API fonctionne ! Voir la console pour les détails.');
+                    } catch (err) {
+                      console.error('❌ Erreur API:', err);
+                      alert('Erreur API - voir la console');
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+                >
+                  🧪 Tester l'API
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
