@@ -4,7 +4,6 @@ const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const crypto = require('crypto');
 const VirtualInventoryManager = require('./virtualInventoryManager.cjs');
-const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
 require('dotenv').config();
 
 class TelegramGiftDetector {
@@ -368,42 +367,6 @@ class TelegramGiftDetector {
       // 🎯 RETIRER DE L'INVENTAIRE VIRTUEL
       this.virtualInventory.removeGiftWithdrawn(withdrawData);
       
-      // 🔄 SYNCHRONISER LE RETRAIT AVEC SUPABASE
-      try {
-        console.log('🔄 Synchronisation du retrait avec Supabase...');
-        
-        // Récupérer l'utilisateur
-        const user = await SupabaseInventoryManager.getOrCreateUser({
-          telegram_id: withdrawData.toUserId,
-          telegram_username: withdrawData.toUsername,
-          telegram_first_name: withdrawData.toUsername,
-          telegram_last_name: ''
-        });
-        
-        // Récupérer le gift
-        const giftRecord = await SupabaseInventoryManager.getOrCreateGift({
-          collectibleId: withdrawData.collectibleId,
-          giftName: withdrawData.giftName,
-          collectibleModel: withdrawData.collectibleModel,
-          collectibleBackdrop: withdrawData.collectibleBackdrop,
-          collectibleSymbol: withdrawData.collectibleSymbol,
-          giftValue: withdrawData.giftValue
-        });
-        
-        // Retirer de l'inventaire Supabase
-        await SupabaseInventoryManager.removeFromInventory(
-          user.id,
-          giftRecord.id,
-          withdrawData.telegramMessageId,
-          withdrawData
-        );
-        
-        console.log('✅ Retrait synchronisé avec Supabase !');
-        
-      } catch (supabaseError) {
-        console.error('❌ Erreur synchronisation retrait Supabase:', supabaseError.message);
-      }
-      
       // Envoyer le webhook pour le withdraw
       await this.sendWebhook('gift_withdrawn', withdrawData);
       
@@ -467,42 +430,6 @@ class TelegramGiftDetector {
 
       // 🎯 AJOUTER À L'INVENTAIRE VIRTUEL
       this.virtualInventory.addGiftReceived(transferData);
-
-      // 🔄 SYNCHRONISER AVEC SUPABASE
-      try {
-        console.log('🔄 Synchronisation avec Supabase...');
-        
-        // Créer ou récupérer l'utilisateur
-        const user = await SupabaseInventoryManager.getOrCreateUser({
-          telegram_id: giftInfo.fromUserId,
-          telegram_username: giftInfo.fromUsername,
-          telegram_first_name: giftInfo.fromUsername,
-          telegram_last_name: ''
-        });
-        
-        // Créer ou récupérer le gift
-        const giftRecord = await SupabaseInventoryManager.getOrCreateGift({
-          collectibleId: giftInfo.collectibleId,
-          giftName: giftInfo.giftName,
-          collectibleModel: giftInfo.collectibleModel,
-          collectibleBackdrop: giftInfo.collectibleBackdrop,
-          collectibleSymbol: giftInfo.collectibleSymbol,
-          giftValue: giftInfo.giftValue
-        });
-        
-        // Ajouter à l'inventaire Supabase
-        await SupabaseInventoryManager.addToInventory(
-          user.id, 
-          giftRecord.id, 
-          message.id.toString(), 
-          transferData
-        );
-        
-        console.log('✅ Synchronisation Supabase réussie !');
-        
-      } catch (supabaseError) {
-        console.error('❌ Erreur synchronisation Supabase:', supabaseError.message);
-      }
 
       // Envoyer le webhook
       try {
@@ -846,22 +773,6 @@ class TelegramGiftDetector {
     
     if (!this.webhookUrl || !this.webhookSecret || !this.apiKey) {
       throw new Error('Configuration webhook incomplète');
-    }
-  }
-
-  // Synchroniser l'inventaire virtuel avec Supabase
-  async syncInventoryToSupabase() {
-    try {
-      console.log('🔄 Début de la synchronisation complète avec Supabase...');
-      
-      const syncCount = await SupabaseInventoryManager.syncVirtualInventory(this.virtualInventory);
-      
-      console.log(`✅ Synchronisation complète terminée: ${syncCount} gifts synchronisés`);
-      return syncCount;
-      
-    } catch (error) {
-      console.error('❌ Erreur lors de la synchronisation complète:', error.message);
-      throw error;
     }
   }
 
