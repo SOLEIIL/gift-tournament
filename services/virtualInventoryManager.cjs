@@ -226,10 +226,15 @@ class VirtualInventoryManager {
   // 🔢 COMPTER LE TOTAL DES GIFTS
   getTotalGifts() {
     try {
+      console.log(`🔍 DEBUG getTotalGifts: virtualInventories.size = ${this.virtualInventories.size}`);
+      
       let total = 0;
       for (const [userId, inventory] of this.virtualInventories) {
+        console.log(`🔍 DEBUG: userId ${userId} a ${inventory.length} gift(s)`);
         total += inventory.length;
       }
+      
+      console.log(`🔍 DEBUG getTotalGifts: total = ${total}`);
       return total;
     } catch (error) {
       console.error('❌ Erreur lors du comptage des gifts:', error.message);
