@@ -1,116 +1,94 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useTelegram } from './useTelegram';
+import { useState, useEffect } from 'react';
 
-export interface InventoryItem {
-  id: number;
-  gift_id: string;
-  gift_name: string;
-  gift_value: number;
-  collectible_model: string;
-  collectible_backdrop: string;
-  collectible_symbol: string;
-  status: string;
-  received_at: string;
-  withdrawn_at: string | null;
+interface Gift {
+  id: string;
+  name: string;
+  model: string;
+  background: string;
+  symbol: string;
+  value: number;
+  date: string;
+  collectibleId: string;
+  giftType: string;
 }
 
-export interface UserInventory {
+interface InventoryResponse {
   success: boolean;
-  telegramId: string;
-  user: {
-    id: number;
-    telegram_id: string;
-    username: string;
-  };
-  inventory: InventoryItem[];
-  count: number;
+  userId: number;
+  username: string;
+  inventory: Gift[];
   timestamp: string;
+  source: string;
 }
 
 export const useInventory = () => {
-  const { webApp, user, isTelegram, isReady } = useTelegram();
-  const [inventory, setInventory] = useState<UserInventory | null>(null);
+  const [inventory, setInventory] = useState<Gift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Récupérer l'inventaire de l'utilisateur connecté
-  const fetchInventory = useCallback(async () => {
-    if (!isTelegram || !webApp || !isReady) {
-      console.log('⚠️ Mini App Telegram non prête');
-      return;
-    }
-
+  const fetchInventory = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsLoading(true);
-      setError(null);
-
-      console.log('📱 Récupération de l\'inventaire...');
+      console.log('🎣 Hook useInventory: Début de la récupération');
       
-      // Récupérer les données d'initialisation Telegram selon la documentation officielle
-      const initData = webApp.initData;
-      
-      if (!initData) {
-        throw new Error('Données d\'initialisation Telegram manquantes');
+      // Vérifier que nous sommes dans Telegram
+      if (!window.Telegram?.WebApp?.initData) {
+        throw new Error('Mini App Telegram non détectée');
       }
 
-      console.log('🔐 Données d\'initialisation récupérées:', initData);
-      console.log('👤 Utilisateur actuel:', user);
+      const initData = window.Telegram.WebApp.initData;
+      console.log('🔐 InitData Telegram détectée:', initData);
 
-      // Appeler l'API avec les données d'authentification
       const response = await fetch('/api/inventory', {
         method: 'GET',
         headers: {
+          'X-Telegram-Init-Data': initData,
           'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData
-        }
+        },
       });
 
-      console.log('📡 Réponse API reçue:', response.status, response.statusText);
+      console.log('📡 Réponse API reçue:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ Erreur API:', errorData);
-        throw new Error(errorData.error || `Erreur HTTP: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const data: UserInventory = await response.json();
-      console.log('📊 Données inventaire reçues:', data);
-      
+      const data: InventoryResponse = await response.json();
+      console.log('✅ Données inventaire reçues:', data);
+
       if (data.success) {
-        setInventory(data);
-        console.log(`✅ Inventaire récupéré: ${data.count} gifts`);
+        setInventory(data.inventory);
+        console.log(`🎁 Inventaire mis à jour: ${data.inventory.length} gifts`);
       } else {
-        throw new Error('Échec de la récupération de l\'inventaire');
+        throw new Error('Réponse API invalide');
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
-      console.error('❌ Erreur lors de la récupération de l\'inventaire:', errorMessage);
+      console.error('❌ Erreur récupération inventaire:', errorMessage);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [isTelegram, webApp, isReady, user]);
+  };
 
-  // Récupérer automatiquement l'inventaire quand la Mini App est prête
-  useEffect(() => {
-    if (isReady && isTelegram) {
-      console.log('🚀 Mini App prête, récupération de l\'inventaire...');
-      fetchInventory();
-    }
-  }, [isReady, isTelegram, fetchInventory]);
-
-  // Rafraîchir l'inventaire manuellement
-  const refreshInventory = useCallback(() => {
-    console.log('🔄 Rafraîchissement manuel de l\'inventaire...');
+  const refreshInventory = () => {
+    console.log('🔄 Rafraîchissement manuel de l\'inventaire');
     fetchInventory();
-  }, [fetchInventory]);
+  };
+
+  useEffect(() => {
+    console.log('🎣 Hook useInventory: Initialisation');
+    fetchInventory();
+  }, []);
 
   return {
     inventory,
     isLoading,
     error,
     refreshInventory,
-    fetchInventory
   };
 };
