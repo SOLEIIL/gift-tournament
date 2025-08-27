@@ -200,112 +200,72 @@ class TelegramGiftDetector {
   // Vérifier les nouveaux messages
   async checkForNewMessages() {
     try {
-      // 🔍 VÉRIFICATION OPTIMISÉE : Utiliser le cache des dialogues
-      let dialogs;
+      console.log('🔍 Vérification des nouveaux messages reçus par @WxyzCrypto...');
       
-      // Essayer de récupérer les dialogues avec gestion des erreurs
+      // 🔍 SURVEILLER SPÉCIFIQUEMENT LES MESSAGES REÇUS PAR @WXYZCRYPTO
       try {
-        dialogs = await this.client.getDialogs();
-      } catch (dialogError) {
-        if (dialogError.message.includes('flood wait') || dialogError.message.includes('FLOOD_WAIT')) {
-          console.log('⏳ Flood wait détecté - Attente avant prochaine vérification...');
-          return; // Sortir sans traiter
+        // Obtenir les messages reçus par @WxyzCrypto (pas les dialogues)
+        const messages = await this.client.getMessages('me', { limit: 10 });
+        
+        if (messages.length === 0) {
+          console.log('📱 Aucun message trouvé dans la boîte de réception de @WxyzCrypto');
+          return;
         }
-        console.warn('⚠️ Erreur lors de la récupération des dialogues:', dialogError.message);
-        return;
-      }
-      
-      // 🔍 FILTRER LES CHATS UTILES : @WxyzCrypto ET les utilisateurs qui lui envoient des gifts
-      const relevantDialogs = dialogs.filter(dialog => {
-        if (!dialog.entity || dialog.entity.className !== 'User') return false;
         
-        // Inclure @WxyzCrypto
-        if (dialog.entity.username === 'WxyzCrypto') return true;
+        console.log(`📱 Vérification de ${messages.length} messages dans la boîte de réception de @WxyzCrypto`);
         
-        // Inclure les utilisateurs qui ont des conversations avec @WxyzCrypto
-        // (ceux qui ont des messages récents)
-        return true; // Temporairement inclure tous les utilisateurs pour le test
-      });
-      
-      if (relevantDialogs.length === 0) {
-        console.log('📱 Aucun dialogue pertinent trouvé');
-        return;
-      }
-      
-      console.log(`📱 Vérification des messages pour ${relevantDialogs.length} dialogue(s) pertinent(s)`);
-      
-      for (const dialog of relevantDialogs) {
-        const chatId = dialog.entity.id.toString();
-        const chatName = dialog.entity.username || dialog.entity.firstName || 'Unknown';
+        // Obtenir le dernier ID connu
+        const lastKnownId = this.lastMessageIds.get('WxyzCrypto') || 0;
         
-        try {
-          // Obtenir les messages récents avec limite réduite
-          const messages = await this.client.getMessages(dialog.entity, { limit: 5 }); // Limite réduite
-          
-          if (messages.length === 0) continue;
-          
-          // Obtenir le dernier ID connu pour ce chat
-          const lastKnownId = this.lastMessageIds.get(chatId) || 0;
-          
-          // Vérifier s'il y a de nouveaux messages
-          for (const message of messages) {
-            if (message.id > lastKnownId) {
-              console.log(`📨 Nouveau message ${message.id} de ${chatName}`);
+        // Vérifier s'il y a de nouveaux messages
+        for (const message of messages) {
+          if (message.id > lastKnownId) {
+            console.log(`📨 Nouveau message ${message.id} reçu par @WxyzCrypto`);
+            
+            // 🎯 VÉRIFIER SI C'EST UN GIFT TELEGRAM
+            if (this.isRealTelegramGift(message)) {
+              console.log('🎁🎁🎁 NOUVEAU GIFT TELEGRAM DÉTECTÉ ! 🎁🎁🎁');
               
-              // 🎯 VÉRIFIER SI C'EST UN GIFT TELEGRAM
-              if (this.isRealTelegramGift(message)) {
-                console.log('🎁🎁🎁 NOUVEAU GIFT TELEGRAM DÉTECTÉ ! 🎁🎁🎁');
-                
-                // 🔍 ENRICHIR LE MESSAGE AVEC LES INFOS DU DIALOGUE
-                const enrichedMessage = {
-                  ...message,
-                  chat: {
-                    id: { value: dialog.entity.id },
-                    username: dialog.entity.username,
-                    title: dialog.entity.firstName || dialog.entity.username
-                  }
-                };
-                
-                // 🔍 DÉTERMINER LE TYPE DE MESSAGE
-                if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
-                  // 🎁 GIFT TELEGRAM
-                                  // 🔍 DÉTERMINER LE TYPE DE MESSAGE
-                if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
-                  // 🎁 GIFT TELEGRAM
-                  if (message.out) {
-                    // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
-                    console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
-                    await this.processWithdrawMessage(enrichedMessage);
-                  } else {
-                    // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
-                    console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
-                    await this.processGiftMessage(enrichedMessage, false);
-                  }
-                } else if (message.message && typeof message.message === 'string') {
-                  // 📝 MESSAGE TEXTE NORMAL
-                  console.log(`📝 MESSAGE TEXTE TRAITÉ: "${message.message}" de ${chatName}`);
-                  // Ici vous pouvez ajouter la logique pour traiter les messages texte
+              // 🔍 ENRICHIR LE MESSAGE
+              const enrichedMessage = {
+                ...message,
+                chat: {
+                  id: { value: message.senderId || 'unknown' },
+                  username: message.sender?.username || 'unknown',
+                  title: message.sender?.firstName || message.sender?.username || 'unknown'
                 }
-                } else if (message.message && typeof message.message === 'string') {
-                  // 📝 MESSAGE TEXTE NORMAL
-                  console.log(`📝 MESSAGE TEXTE TRAITÉ: "${message.message}" de ${chatName}`);
-                  // Ici vous pouvez ajouter la logique pour traiter les messages texte
+              };
+              
+              // 🔍 DÉTERMINER LE TYPE DE MESSAGE
+              if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
+                // 🎁 GIFT TELEGRAM
+                if (message.out) {
+                  // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
+                  console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
+                  await this.processWithdrawMessage(enrichedMessage);
+                } else {
+                  // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
+                  console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
+                  await this.processGiftMessage(enrichedMessage, false);
                 }
+              } else if (message.message && typeof message.message === 'string') {
+                // 📝 MESSAGE TEXTE NORMAL
+                console.log(`📝 MESSAGE TEXTE REÇU PAR @WxyzCrypto: "${message.message}"`);
+                // Ici vous pouvez ajouter la logique pour traiter les messages texte
               }
-              
-              // Mettre à jour le dernier ID
-              this.lastMessageIds.set(chatId, Math.max(message.id, lastKnownId));
             }
+            
+            // Mettre à jour le dernier ID
+            this.lastMessageIds.set('WxyzCrypto', Math.max(message.id, lastKnownId));
           }
-          
-        } catch (chatError) {
-          if (chatError.message.includes('flood wait') || chatError.message.includes('FLOOD_WAIT')) {
-            console.log('⏳ Flood wait lors de la vérification du chat - Attente...');
-            break; // Sortir de la boucle
-          }
-          console.warn(`⚠️ Erreur lors de la vérification du chat ${chatName}:`, chatError.message);
-          continue;
         }
+        
+      } catch (messageError) {
+        if (messageError.message.includes('flood wait') || messageError.message.includes('FLOOD_WAIT')) {
+          console.log('⏳ Flood wait lors de la vérification des messages - Attente...');
+          return;
+        }
+        console.warn('⚠️ Erreur lors de la vérification des messages:', messageError.message);
       }
       
     } catch (error) {
