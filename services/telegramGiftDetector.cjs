@@ -399,8 +399,8 @@ class TelegramGiftDetector {
       
       console.log('📋 Informations du WITHDRAW:', withdrawData);
       
-      // 🎯 RETIRER DE L'INVENTAIRE VIRTUEL
-      this.virtualInventory.removeGiftWithdrawn(withdrawData);
+      // 🎯 RETIRER DE L'INVENTAIRE VIRTUEL ET SYNCHRONISER AVEC SUPABASE
+      await this.virtualInventory.removeGiftWithdrawn(withdrawData);
       
       // Envoyer le webhook pour le withdraw
       await this.sendWebhook('gift_withdrawn', withdrawData);

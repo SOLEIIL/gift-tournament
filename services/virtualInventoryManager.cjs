@@ -72,7 +72,7 @@ class VirtualInventoryManager {
   }
 
   // 🚫 RETIRER UN GIFT (withdraw)
-  removeGiftWithdrawn(giftData) {
+  async removeGiftWithdrawn(giftData) {
     try {
       const { toUserId, toUsername, giftId, giftName, telegramMessageId } = giftData;
       
@@ -147,6 +147,15 @@ class VirtualInventoryManager {
         toUsername,
         giftName
       });
+
+      // 🔄 SYNCHRONISER AVEC SUPABASE (comme pour l'ajout)
+      try {
+        console.log('🔄 Synchronisation du retrait avec Supabase...');
+        await this.syncWithdrawToSupabase(giftData);
+        console.log('✅ Retrait synchronisé avec Supabase !');
+      } catch (syncError) {
+        console.error('❌ Erreur synchronisation Supabase:', syncError.message);
+      }
 
       console.log(`🚫 Gift retiré: ${giftName} de ${toUsername} (${toUserId})`);
       
@@ -378,6 +387,51 @@ class VirtualInventoryManager {
       
     } catch (error) {
       console.error('❌ Erreur lors de la synchronisation Supabase:', error.message);
+      throw error;
+    }
+  }
+
+  // 🔄 SYNCHRONISER UN RETRAIT AVEC SUPABASE
+  async syncWithdrawToSupabase(withdrawData) {
+    try {
+      console.log('🔄 Synchronisation du retrait avec Supabase...');
+      
+      // Importer SupabaseInventoryManager
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      
+      const { toUserId, toUsername, giftId, giftName, collectibleId, telegramMessageId } = withdrawData;
+      
+      // Vérifier que nous avons un utilisateur valide
+      if (!toUserId || toUserId === 'unknown') {
+        throw new Error('ID utilisateur invalide pour la synchronisation');
+      }
+      
+      console.log(`   📤 Retrait de ${giftName} pour l'utilisateur ${toUsername} (${toUserId})`);
+      
+      // Retirer le gift de l'inventaire Supabase
+      const result = await SupabaseInventoryManager.removeFromInventory(
+        toUserId,
+        giftId || collectibleId, // Utiliser giftId ou collectibleId
+        telegramMessageId,
+        {
+          giftName,
+          collectibleId,
+          username: toUsername
+        }
+      );
+      
+      if (result) {
+        console.log(`   ✅ Gift retiré de Supabase: ${giftName}`);
+        console.log(`   📊 Nouveau statut: ${result.status}`);
+        console.log(`   🕐 Date de retrait: ${result.withdrawn_at}`);
+      } else {
+        console.log(`   ⚠️ Gift non trouvé dans l'inventaire actif de Supabase`);
+      }
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation du retrait avec Supabase:', error.message);
       throw error;
     }
   }
