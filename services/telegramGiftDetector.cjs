@@ -215,15 +215,20 @@ class TelegramGiftDetector {
         return;
       }
       
-      // 🔍 FILTRER UNIQUEMENT LES CHATS UTILES
-      const relevantDialogs = dialogs.filter(dialog => 
-        dialog.entity && 
-        dialog.entity.className === 'User' && 
-        dialog.entity.username === 'WxyzCrypto' // Seulement @WxyzCrypto
-      );
+      // 🔍 FILTRER LES CHATS UTILES : @WxyzCrypto ET les utilisateurs qui lui envoient des gifts
+      const relevantDialogs = dialogs.filter(dialog => {
+        if (!dialog.entity || dialog.entity.className !== 'User') return false;
+        
+        // Inclure @WxyzCrypto
+        if (dialog.entity.username === 'WxyzCrypto') return true;
+        
+        // Inclure les utilisateurs qui ont des conversations avec @WxyzCrypto
+        // (ceux qui ont des messages récents)
+        return true; // Temporairement inclure tous les utilisateurs pour le test
+      });
       
       if (relevantDialogs.length === 0) {
-        console.log('📱 Aucun dialogue pertinent trouvé pour @WxyzCrypto');
+        console.log('📱 Aucun dialogue pertinent trouvé');
         return;
       }
       
