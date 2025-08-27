@@ -117,7 +117,22 @@ class TelegramGiftDetector {
       
       console.log('🔍 Recherche des VRAIS gifts Telegram dans l\'historique...');
       
-      for (const dialog of dialogs) {
+      // 🎯 FILTRER UNIQUEMENT LE COMPTE DE DÉPÔT @WxyzCrypto
+      const depositAccountDialogs = dialogs.filter(dialog => 
+        dialog.entity && 
+        dialog.entity.className === 'User' && 
+        dialog.entity.username === this.depositAccountUsername
+      );
+      
+      if (depositAccountDialogs.length === 0) {
+        console.log(`❌ Aucun dialogue trouvé pour le compte de dépôt @${this.depositAccountUsername}`);
+        console.log('🛑 ARRÊT du scan - compte de dépôt non trouvé');
+        return;
+      }
+      
+      console.log(`✅ Compte de dépôt @${this.depositAccountUsername} trouvé, scan en cours...`);
+      
+      for (const dialog of depositAccountDialogs) {
         if (dialog.entity && dialog.entity.className === 'User') {
           const chatId = dialog.entity.id.toString();
           console.log(`📱 Vérification du chat avec: ${dialog.entity.username || dialog.entity.firstName || 'Unknown'}`);
@@ -219,7 +234,7 @@ class TelegramGiftDetector {
       const relevantDialogs = dialogs.filter(dialog => 
         dialog.entity && 
         dialog.entity.className === 'User' && 
-        dialog.entity.username === 'WxyzCrypto' // Seulement @WxyzCrypto
+        dialog.entity.username === this.depositAccountUsername // Seulement le compte de dépôt configuré
       );
       
       if (relevantDialogs.length === 0) {
