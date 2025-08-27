@@ -130,9 +130,9 @@ class ProductionSystem {
       // Vérifier la connexion Supabase et compter les gifts
       try {
         const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
-        const testInventory = await SupabaseInventoryManager.getUserInventory(config.testPlayerUsername);
-        const totalGifts = testInventory.length;
-        console.log(`   🗄️  Supabase: ✅ (${totalGifts} gifts récupérés pour @${config.testPlayerUsername})`);
+        // Compter tous les gifts actifs dans la base au lieu d'un utilisateur test
+        const totalGifts = await SupabaseInventoryManager.getTotalActiveGifts();
+        console.log(`   🗄️  Supabase: ✅ (${totalGifts} gifts actifs au total)`);
       } catch (error) {
         console.log(`   🗄️  Supabase: ❌ (${error.message})`);
       }
@@ -177,8 +177,8 @@ class ProductionSystem {
     
     try {
       const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
-      const testInventory = await SupabaseInventoryManager.getUserInventory(config.testPlayerUsername);
-      totalGifts = testInventory.length;
+      // Compter tous les gifts actifs dans la base au lieu d'un utilisateur test
+      totalGifts = await SupabaseInventoryManager.getTotalActiveGifts();
     } catch (error) {
       console.log(`   🗄️  Erreur Supabase dans getStatus: ${error.message}`);
     }
