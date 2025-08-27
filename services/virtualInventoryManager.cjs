@@ -74,7 +74,7 @@ class VirtualInventoryManager {
   // 🚫 RETIRER UN GIFT (withdraw)
   async removeGiftWithdrawn(giftData) {
     try {
-      const { toUserId, toUsername, giftId, giftName, telegramMessageId } = giftData;
+      const { toUserId, toUsername, giftId, giftName, telegramMessageId, collectibleId } = giftData;
       
       if (!toUserId || toUserId === 'unknown') {
         console.error('❌ Impossible de retirer un gift sans ID utilisateur valide');
@@ -106,17 +106,17 @@ class VirtualInventoryManager {
       // Fallback: chercher par collectibleId et giftName
       if (!pendingGift) {
         for (const [key, gift] of this.pendingGifts) {
-          if (gift.collectibleId === giftData.collectibleId && gift.giftName === giftName) {
+          if (gift.collectibleId === collectibleId && gift.giftName === giftName) {
             pendingGift = gift;
             giftKey = key;
-            console.log(`✅ Gift trouvé par collectibleId: ${giftData.collectibleId}`);
+            console.log(`✅ Gift trouvé par collectibleId: ${collectibleId}`);
             break;
           }
         }
       }
       
       if (!pendingGift) {
-        console.warn(`⚠️ Gift ${giftName} (${giftData.collectibleId}) non trouvé dans les gifts en attente`);
+        console.warn(`⚠️ Gift ${giftName} (${collectibleId}) non trouvé dans les gifts en attente`);
         return false;
       }
 
@@ -125,7 +125,7 @@ class VirtualInventoryManager {
         const userInventory = this.virtualInventories.get(toUserId);
         const giftIndex = userInventory.findIndex(gift => 
           gift.giftId === giftId || 
-          gift.collectibleId === giftData.collectibleId ||
+          gift.collectibleId === collectibleId ||
           gift.messageId === telegramMessageId
         );
         
@@ -148,13 +148,13 @@ class VirtualInventoryManager {
         giftName
       });
 
-      // 🔄 SYNCHRONISER AVEC SUPABASE (comme pour l'ajout)
+      // 🔄 SYNCHRONISER AVEC SUPABASE
       try {
-        console.log('🔄 Synchronisation du retrait avec Supabase...');
         await this.syncWithdrawToSupabase(giftData);
-        console.log('✅ Retrait synchronisé avec Supabase !');
+        console.log(`✅ Synchronisation Supabase réussie pour le retrait de ${giftName}`);
       } catch (syncError) {
-        console.error('❌ Erreur synchronisation Supabase:', syncError.message);
+        console.error(`❌ Erreur synchronisation Supabase pour le retrait:`, syncError.message);
+        // Ne pas faire échouer le retrait virtuel à cause de l'erreur Supabase
       }
 
       console.log(`🚫 Gift retiré: ${giftName} de ${toUsername} (${toUserId})`);
@@ -391,27 +391,31 @@ class VirtualInventoryManager {
     }
   }
 
-  // 🔄 SYNCHRONISER UN RETRAIT AVEC SUPABASE
+  // 🚫 SYNCHRONISER UN RETRAIT AVEC SUPABASE
   async syncWithdrawToSupabase(withdrawData) {
     try {
-      console.log('🔄 Synchronisation du retrait avec Supabase...');
+      console.log(`🔄 Synchronisation du retrait avec Supabase...`);
       
-      // Importer SupabaseInventoryManager
-      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      const { toUserId, toUsername, collectibleId, giftName, telegramMessageId } = withdrawData;
       
-      const { toUserId, toUsername, giftId, giftName, collectibleId, telegramMessageId } = withdrawData;
-      
-      // Vérifier que nous avons un utilisateur valide
       if (!toUserId || toUserId === 'unknown') {
-        throw new Error('ID utilisateur invalide pour la synchronisation');
+        throw new Error('ID utilisateur invalide pour la synchronisation Supabase');
       }
       
-      console.log(`   📤 Retrait de ${giftName} pour l'utilisateur ${toUsername} (${toUserId})`);
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      
+      // Créer ou récupérer l'utilisateur
+      const user = await SupabaseInventoryManager.getOrCreateUser({
+        telegram_id: toUserId,
+        telegram_username: toUsername,
+        telegram_first_name: toUsername || 'Unknown',
+        telegram_last_name: ''
+      });
       
       // Retirer le gift de l'inventaire Supabase
       const result = await SupabaseInventoryManager.removeFromInventory(
-        toUserId,
-        giftId || collectibleId, // Utiliser giftId ou collectibleId
+        user.telegram_id, // Utiliser telegram_id au lieu de user.id
+        collectibleId,
         telegramMessageId,
         {
           giftName,
@@ -421,11 +425,9 @@ class VirtualInventoryManager {
       );
       
       if (result) {
-        console.log(`   ✅ Gift retiré de Supabase: ${giftName}`);
-        console.log(`   📊 Nouveau statut: ${result.status}`);
-        console.log(`   🕐 Date de retrait: ${result.withdrawn_at}`);
+        console.log(`✅ Retrait synchronisé avec Supabase: ${giftName} retiré de l'inventaire de @${toUsername}`);
       } else {
-        console.log(`   ⚠️ Gift non trouvé dans l'inventaire actif de Supabase`);
+        console.log(`⚠️ Gift ${giftName} non trouvé dans l'inventaire Supabase de @${toUsername}`);
       }
       
       return result;
