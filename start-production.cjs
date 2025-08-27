@@ -131,8 +131,8 @@ class ProductionSystem {
       try {
         const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
         
-        // Compter les gifts dans l'inventaire virtuel
-        const virtualGifts = this.virtualInventory.getTotalGifts();
+        // Compter les gifts dans l'inventaire virtuel du détecteur (qui a les vrais gifts)
+        const virtualGifts = this.giftDetector?.virtualInventory?.getTotalGifts() || 0;
         
         // Compter les gifts dans Supabase
         const supabaseGifts = await SupabaseInventoryManager.getTotalActiveGifts();
