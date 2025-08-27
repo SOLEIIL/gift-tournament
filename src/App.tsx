@@ -1,11 +1,13 @@
 
 import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useTournamentState } from './hooks/useTournamentState';
 import { useTelegram } from './hooks/useTelegram';
 import { Lobby } from './components/Lobby';
 import { Round } from './components/Round';
 import { Victory } from './components/Victory';
 import { Inventory } from './components/Inventory';
+import { InventoryPage } from './pages/InventoryPage';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn'>('pvp');
@@ -98,42 +100,43 @@ function App() {
 
   // Apply Telegram theme colors if available
   useEffect(() => {
-    if (themeParams.bg_color) {
-      document.documentElement.style.setProperty('--tg-bg-color', themeParams.bg_color);
-    }
-    if (themeParams.text_color) {
-      document.documentElement.style.setProperty('--tg-text-color', themeParams.text_color);
-    }
-    if (themeParams.button_color) {
-      document.documentElement.style.setProperty('--tg-button-color', themeParams.button_color);
-    }
-    if (themeParams.button_text_color) {
-      document.documentElement.style.setProperty('--tg-button-text-color', themeParams.button_text_color);
+    if (themeParams) {
+      document.documentElement.style.setProperty('--tg-theme-bg-color', themeParams.bg_color || '#ffffff');
+      document.documentElement.style.setProperty('--tg-theme-text-color', themeParams.text_color || '#000000');
+      document.documentElement.style.setProperty('--tg-theme-hint-color', themeParams.hint_color || '#999999');
+      document.documentElement.style.setProperty('--tg-theme-link-color', themeParams.link_color || '#2481cc');
+      document.documentElement.style.setProperty('--tg-theme-button-color', themeParams.button_color || '#2481cc');
+      document.documentElement.style.setProperty('--tg-theme-button-text-color', themeParams.button_text_color || '#ffffff');
     }
   }, [themeParams]);
 
   // Expand app when ready
   useEffect(() => {
-    if (isReady && isTelegram) {
+    if (isReady && expandApp) {
       expandApp();
     }
-  }, [isReady, isTelegram, expandApp]);
+  }, [isReady, expandApp]);
 
-  if (!isReady) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="App" style={{
-      backgroundColor: themeParams.bg_color || '#1a1a1a',
-      color: themeParams.text_color || '#ffffff'
-    }}>
+  // Main app content
+  const MainApp = () => (
+    <div className="App">
       {renderCurrentPage()}
     </div>
+  );
+
+  return (
+    <Router>
+      <Routes>
+        {/* Route principale de l'application */}
+        <Route path="/" element={<MainApp />} />
+        
+        {/* Route directe vers l'inventaire */}
+        <Route path="/inventory" element={<InventoryPage />} />
+        
+        {/* Redirection par défaut */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }
 
