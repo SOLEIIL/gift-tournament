@@ -276,6 +276,7 @@ class TelegramGiftDetector {
           // Vérifier s'il y a de nouveaux messages
           for (const message of messages) {
             if (message.id > lastKnownId) {
+              // 📨 AFFICHER TOUS LES MESSAGES DANS LES LOGS (pour le debug)
               console.log(`📨 Nouveau message ${message.id} de ${chatName}`);
               
               // 🎯 VÉRIFIER SI C'EST UN GIFT TELEGRAM
@@ -301,6 +302,9 @@ class TelegramGiftDetector {
                   console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
                   await this.processGiftMessage(enrichedMessage, false);
                 }
+              } else {
+                // 📝 MESSAGE IGNORÉ (pas un gift)
+                console.log(`📝 Message ignoré (pas un gift Telegram)`);
               }
               
               // Mettre à jour le dernier ID
