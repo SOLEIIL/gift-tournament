@@ -3,6 +3,7 @@
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const crypto = require('crypto');
+const VirtualInventoryManager = require('./virtualInventoryManager.cjs');
 require('dotenv').config();
 
 class TelegramGiftDetector {
@@ -25,6 +26,9 @@ class TelegramGiftDetector {
     this.client = null;
     this.pollingInterval = null;
     this.lastMessageIds = new Map(); // Stocker le dernier ID de message par chat
+    
+    // 🎯 Gestionnaire d'inventaire virtuel
+    this.virtualInventory = new VirtualInventoryManager();
     
     // Validation de la configuration
     this.validateConfig();
@@ -64,6 +68,9 @@ class TelegramGiftDetector {
         // 🔍 SCANNER L'HISTOIRE DES GIFTS REÇUS
         console.log('🔍 Scanner l\'historique des gifts reçus...');
         await this.scanHistory();
+        
+        // 🎯 AFFICHER L'INVENTAIRE VIRTUEL ACTUEL
+        this.virtualInventory.displayAllInventories();
         
         // Démarrer la surveillance par polling
         console.log('📨 Démarrage de la surveillance des gifts par polling...');
@@ -296,6 +303,9 @@ class TelegramGiftDetector {
       
       console.log('📋 Informations du WITHDRAW:', withdrawData);
       
+      // 🎯 RETIRER DE L'INVENTAIRE VIRTUEL
+      this.virtualInventory.removeGiftWithdrawn(withdrawData);
+      
       // Envoyer le webhook pour le withdraw
       await this.sendWebhook('gift_withdrawn', withdrawData);
       
@@ -351,6 +361,9 @@ class TelegramGiftDetector {
       };
 
       console.log('📋 Informations complètes du transfert:', transferData);
+
+      // 🎯 AJOUTER À L'INVENTAIRE VIRTUEL
+      this.virtualInventory.addGiftReceived(transferData);
 
       // Envoyer le webhook
       try {
