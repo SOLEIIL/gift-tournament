@@ -65,35 +65,27 @@ export const Inventory: React.FC = () => {
               >
                 {/* En-tête du gift */}
                 <div className="text-center mb-4">
-                  <div className="text-4xl mb-2">{gift.symbol}</div>
+                  <div className="text-4xl mb-2">🎁</div>
                   <h3 className="text-xl font-bold text-white">
-                    {gift.name} #{gift.collectibleId.split('-')[1]}
+                    {gift.display_name}
                   </h3>
-                  <p className="text-blue-400 font-semibold">{gift.value} ⭐</p>
+                  <p className="text-blue-400 font-semibold">Gift Telegram</p>
                 </div>
 
                 {/* Détails du gift */}
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Modèle:</span>
-                    <span className="text-white font-medium">{gift.model}</span>
+                    <span className="text-gray-300">Collectible ID:</span>
+                    <span className="text-white font-medium">{gift.collectible_id}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Arrière-plan:</span>
-                    <span className="text-white font-medium">{gift.background}</span>
+                    <span className="text-gray-300">Username:</span>
+                    <span className="text-white font-medium">@{gift.username}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-300">Symbole:</span>
-                    <span className="text-white font-medium">{gift.symbol}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Type:</span>
-                    <span className="text-white font-medium">{gift.giftType}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Date:</span>
+                    <span className="text-gray-300">Reçu le:</span>
                     <span className="text-white font-medium">
-                      {new Date(gift.date).toLocaleDateString('fr-FR')}
+                      {new Date(gift.received_at).toLocaleDateString('fr-FR')}
                     </span>
                   </div>
                 </div>
@@ -122,7 +114,7 @@ export const Inventory: React.FC = () => {
             <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4 max-w-md mx-auto">
               <p className="text-blue-300 text-sm">
                 💡 <strong>Astuce :</strong> Les gifts sont détectés en temps réel 
-                par notre système de surveillance automatique.
+                par notre système de surveillance automatique et synchronisés avec votre base de données.
               </p>
             </div>
           </div>

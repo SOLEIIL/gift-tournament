@@ -2,23 +2,26 @@ import { useState, useEffect } from 'react';
 
 interface Gift {
   id: string;
-  name: string;
-  model: string;
-  background: string;
-  symbol: string;
-  value: number;
-  date: string;
-  collectibleId: string;
-  giftType: string;
+  collectible_id: string;
+  username: string;
+  display_name: string;
+  received_at: string;
 }
 
 interface InventoryResponse {
   success: boolean;
-  userId: number;
-  username: string;
+  user: {
+    telegram_id: string;
+    username: string;
+  };
   inventory: Gift[];
+  count: number;
   timestamp: string;
-  source: string;
+  security: {
+    authenticated: boolean;
+    method: string;
+    user_verified: boolean;
+  };
 }
 
 export const useInventory = () => {
@@ -41,7 +44,7 @@ export const useInventory = () => {
       const initData = window.Telegram.WebApp.initData;
       console.log('🔐 InitData Telegram détectée:', initData);
 
-      const response = await fetch('/api/inventory', {
+      const response = await fetch('/api/telegram-inventory-secure', {
         method: 'GET',
         headers: {
           'X-Telegram-Init-Data': initData,

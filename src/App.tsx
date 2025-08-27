@@ -8,7 +8,7 @@ import { Round } from './components/Round';
 import { Victory } from './components/Victory';
 import { Inventory } from './components/Inventory';
 import { InventoryPage } from './pages/InventoryPage';
-import { SecureInventoryPage } from './pages/SecureInventoryPage';
+
 
 function App() {
   const [currentPage, setCurrentPage] = useState<'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn'>('pvp');
@@ -134,8 +134,7 @@ function App() {
         {/* Route directe vers l'inventaire */}
         <Route path="/inventory" element={<InventoryPage />} />
         
-        {/* Route vers l'inventaire sécurisé Telegram */}
-        <Route path="/secure-inventory" element={<SecureInventoryPage />} />
+
         
         {/* Redirection par défaut */}
         <Route path="*" element={<Navigate to="/" replace />} />
