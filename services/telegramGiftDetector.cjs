@@ -266,14 +266,30 @@ class TelegramGiftDetector {
                   }
                 };
                 
-                if (message.out) {
-                  // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
-                  console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
-                  await this.processWithdrawMessage(enrichedMessage);
-                } else {
-                  // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
-                  console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
-                  await this.processGiftMessage(enrichedMessage, false);
+                // 🔍 DÉTERMINER LE TYPE DE MESSAGE
+                if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
+                  // 🎁 GIFT TELEGRAM
+                                  // 🔍 DÉTERMINER LE TYPE DE MESSAGE
+                if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
+                  // 🎁 GIFT TELEGRAM
+                  if (message.out) {
+                    // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
+                    console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
+                    await this.processWithdrawMessage(enrichedMessage);
+                  } else {
+                    // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
+                    console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
+                    await this.processGiftMessage(enrichedMessage, false);
+                  }
+                } else if (message.message && typeof message.message === 'string') {
+                  // 📝 MESSAGE TEXTE NORMAL
+                  console.log(`📝 MESSAGE TEXTE TRAITÉ: "${message.message}" de ${chatName}`);
+                  // Ici vous pouvez ajouter la logique pour traiter les messages texte
+                }
+                } else if (message.message && typeof message.message === 'string') {
+                  // 📝 MESSAGE TEXTE NORMAL
+                  console.log(`📝 MESSAGE TEXTE TRAITÉ: "${message.message}" de ${chatName}`);
+                  // Ici vous pouvez ajouter la logique pour traiter les messages texte
                 }
               }
               
@@ -301,7 +317,7 @@ class TelegramGiftDetector {
     }
   }
 
-  // Vérifier si un message contient un vrai gift Telegram
+    // Vérifier si un message contient un vrai gift Telegram
   isRealTelegramGift(message) {
     try {
       // 🎯 UNIQUEMENT : DÉTECTION DES GIFTS NATIFS TELEGRAM (MessageActionStarGiftUnique)
@@ -316,9 +332,15 @@ class TelegramGiftDetector {
         }
       }
 
+      // 🔍 POUR LE TEST : DÉTECTER AUSSI LES MESSAGES TEXTE NORMALS
+      if (message.message && typeof message.message === 'string' && message.message.trim() !== '') {
+        console.log(`📝 MESSAGE TEXTE DÉTECTÉ POUR TEST: "${message.message}"`);
+        return true; // Détecter les messages texte pour le test
+      }
+
       // 🚫 TOUT LE RESTE EST IGNORÉ
       return false;
-
+      
     } catch (error) {
       console.error('❌ Erreur lors de la vérification du gift:', error.message);
       return false;
