@@ -1,4 +1,14 @@
-# 🚀 SYSTÈME DE SYNCHRONISATION DES GIFTS TELEGRAM - GUIDE DE PRODUCTION
+# 🎁 SYSTÈME DE PRODUCTION GIFTS CASINO
+
+## 🌐 **URLS DE PRODUCTION :**
+
+### **🌍 Application Web :**
+- **Production** : `https://giftscasinobackup2025-08-2702-08-oee7jxbcd-soleiils-projects.vercel.app`
+- **API Inventory** : `https://giftscasinobackup2025-08-2702-08-oee7jxbcd-soleiils-projects.vercel.app/api/inventory`
+
+### **📱 Configuration Telegram :**
+- **URL de base** : `https://giftscasinobackup2025-08-2702-08-oee7jxbcd-soleiils-projects.vercel.app`
+- **Mini App** : Configurez cette URL dans votre bot Telegram
 
 ## 📋 **VUE D'ENSEMBLE**
 

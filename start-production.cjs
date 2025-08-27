@@ -83,8 +83,8 @@ class ProductionSystem {
     // Initialiser le détecteur de gifts
     this.giftDetector = new TelegramGiftDetector(config, this.virtualInventory);
     
-    // Initialiser le bot d'inventaire
-    this.inventoryBot = new TelegramInventoryBot(config, this.virtualInventory);
+    // Initialiser le bot d'inventaire SANS virtualInventory pour éviter les conflits
+    this.inventoryBot = new TelegramInventoryBot(config, null);
     
     console.log('✅ Composants initialisés');
   }
@@ -126,13 +126,13 @@ class ProductionSystem {
       console.log(`   ⏱️  Uptime: ${uptime}s`);
       console.log(`   🎁 Détecteur: ${this.giftDetector?.isRunning ? '✅' : '❌'}`);
       console.log(`   🤖 Bot: ${this.inventoryBot?.isRunning ? '✅' : '❌'}`);
-      console.log(`   📱 Inventaire virtuel: ${this.virtualInventory.getTotalGifts()} gifts`);
       
-      // Vérifier la connexion Supabase
+      // Vérifier la connexion Supabase et compter les gifts
       try {
         const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
         const testInventory = await SupabaseInventoryManager.getUserInventory('test');
-        console.log(`   🗄️  Supabase: ✅ (${testInventory.length} gifts récupérés)`);
+        const totalGifts = testInventory.length;
+        console.log(`   🗄️  Supabase: ✅ (${totalGifts} gifts récupérés)`);
       } catch (error) {
         console.log(`   🗄️  Supabase: ❌ (${error.message})`);
       }
@@ -172,14 +172,24 @@ class ProductionSystem {
   }
 
   // Obtenir le statut du système
-  getStatus() {
+  async getStatus() {
+    let totalGifts = 0;
+    
+    try {
+      const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
+      const testInventory = await SupabaseInventoryManager.getUserInventory('test');
+      totalGifts = testInventory.length;
+    } catch (error) {
+      console.log(`   🗄️  Erreur Supabase dans getStatus: ${error.message}`);
+    }
+    
     return {
       isRunning: this.isRunning,
       startTime: this.startTime,
       uptime: this.startTime ? Math.floor((new Date() - this.startTime) / 1000) : 0,
       giftDetector: this.giftDetector?.isRunning || false,
       inventoryBot: this.inventoryBot?.isRunning || false,
-      totalGifts: this.virtualInventory.getTotalGifts()
+      totalGifts: totalGifts
     };
   }
 }

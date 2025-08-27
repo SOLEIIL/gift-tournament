@@ -1,6 +1,5 @@
 // services/telegramInventoryBot.js
 const crypto = require('crypto');
-const VirtualInventoryManager = require('./virtualInventoryManager.cjs');
 
 class TelegramInventoryBot {
   constructor(config, virtualInventoryManager = null) {
@@ -8,11 +7,18 @@ class TelegramInventoryBot {
     this.botToken = config.botToken;
     this.depositAccountUsername = config.depositAccountUsername;
     
-    // Utiliser l'instance partagée ou en créer une nouvelle
-    this.virtualInventory = virtualInventoryManager || new VirtualInventoryManager();
+    // Ne plus utiliser l'inventaire virtuel - tout passe par Supabase
+    this.virtualInventory = null;
     
     this.isRunning = false;
     this.updateId = 0;
+    
+    // Système de déduplication pour éviter les messages multiples
+    this.processedUpdates = new Set();
+    this.lastProcessedTime = new Map();
+    this.duplicateThreshold = 5000; // 5 secondes
+    
+    console.log('🤖 Bot d\'inventaire initialisé avec Supabase uniquement');
   }
 
   // Démarrer le bot
@@ -60,20 +66,37 @@ class TelegramInventoryBot {
       try {
         const updates = await this.getUpdates();
         
+        // Traiter les mises à jour dans l'ordre avec déduplication
         for (const update of updates) {
-          if (update.message) {
-            await this.handleMessage(update.message);
-          } else if (update.callback_query) {
-            await this.handleCallbackQuery(update.callback_query);
+          try {
+            // Vérifier si cette mise à jour a déjà été traitée
+            if (this.isUpdateAlreadyProcessed(update)) {
+              console.log(`🔄 Mise à jour ${update.update_id} déjà traitée, ignorée`);
+              continue;
+            }
+            
+            if (update.message) {
+              await this.handleMessage(update.message);
+            } else if (update.callback_query) {
+              await this.handleCallbackQuery(update.callback_query);
+            }
+            
+            // Marquer comme traitée et mettre à jour l'offset
+            this.markUpdateAsProcessed(update);
+            this.updateId = Math.max(this.updateId, update.update_id);
+            
+          } catch (error) {
+            console.error('❌ Erreur lors du traitement de la mise à jour:', error);
+            // Continuer avec les autres mises à jour
           }
         }
         
-        // Continuer la surveillance
-        setTimeout(pollUpdates, 1000);
+        // Continuer la surveillance avec un délai plus long pour éviter la surcharge
+        setTimeout(pollUpdates, 2000);
         
       } catch (error) {
         console.error('❌ Erreur lors de la surveillance:', error);
-        setTimeout(pollUpdates, 5000);
+        setTimeout(pollUpdates, 10000);
       }
     };
 
@@ -82,18 +105,23 @@ class TelegramInventoryBot {
 
   // Récupérer les mises à jour
   async getUpdates() {
-    const response = await fetch(
-      `https://api.telegram.org/bot${this.botToken}/getUpdates?offset=${this.updateId + 1}&timeout=30`
-    );
-    
-    const result = await response.json();
-    
-    if (result.ok && result.result.length > 0) {
-      this.updateId = result.result[result.result.length - 1].update_id;
-      return result.result;
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/getUpdates?offset=${this.updateId + 1}&timeout=10&limit=100`
+      );
+      
+      const result = await response.json();
+      
+      if (result.ok && result.result && result.result.length > 0) {
+        // Retourner directement tous les updates - la déduplication se fait au niveau du traitement
+        return result.result;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des mises à jour:', error);
+      return [];
     }
-    
-    return [];
   }
 
   // Gérer un message reçu
@@ -204,13 +232,15 @@ class TelegramInventoryBot {
   // Afficher l'inventaire d'un utilisateur
   async showInventory(chatId, userId, username) {
     try {
-      const inventory = this.virtualInventory.getUserInventory(userId);
+      // Utiliser Supabase au lieu de l'inventaire virtuel
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      const inventory = await SupabaseInventoryManager.getUserInventory(userId);
       
       // Calculer les statistiques basiques
       const stats = {
         totalGifts: inventory.length,
-        totalValue: inventory.reduce((sum, gift) => sum + (gift.giftValue || 0), 0),
-        uniqueGifts: new Set(inventory.map(gift => gift.giftName)).size
+        totalValue: inventory.reduce((sum, gift) => sum + (gift.gift_value || 0), 0),
+        uniqueGifts: new Set(inventory.map(gift => gift.gift_name)).size
       };
       
       if (inventory.length === 0) {
@@ -219,31 +249,16 @@ class TelegramInventoryBot {
       }
       
       let message = `📦 **Inventaire de @${username}**\n\n`;
-      message += `📊 **Statistiques :**\n`;
-      message += `• Total: ${stats.totalGifts} gifts\n`;
-      message += `• Valeur: ${stats.totalValue} stars\n`;
-      message += `• Types uniques: ${stats.uniqueGifts}\n\n`;
       
-      // Grouper les gifts par nom
-      const giftGroups = {};
-      inventory.forEach(gift => {
-        if (!giftGroups[gift.giftName]) {
-          giftGroups[gift.giftName] = [];
-        }
-        giftGroups[gift.giftName].push(gift);
-      });
-      
-      // Afficher chaque type de gift
-      for (const [giftName, gifts] of Object.entries(giftGroups)) {
-        const gift = gifts[0]; // Premier gift du groupe
-        const count = gifts.length;
+      // Afficher chaque gift individuellement avec son collectible_id
+      inventory.forEach((gift) => {
+        // Extraire le nom court et le numéro du collectible_id
+        const collectibleId = gift.gift_id || '';
+        const shortName = collectibleId.split('-')[0] || gift.gift_name;
+        const giftNumber = collectibleId.split('-')[1] || '';
         
-        message += `🎁 **${giftName}** (x${count})\n`;
-        if (gift.collectibleModel) message += `• Modèle: ${gift.collectibleModel}\n`;
-        if (gift.collectibleBackdrop) message += `• Arrière-plan: ${gift.collectibleBackdrop}\n`;
-        if (gift.collectibleSymbol) message += `• Symbole: ${gift.collectibleSymbol}\n`;
-        message += `• Valeur: ${gift.giftValue} stars\n\n`;
-      }
+        message += `🎁 **${shortName}** #${giftNumber}\n`;
+      });
       
       // Ajouter les boutons d'action
       const keyboard = {
@@ -269,15 +284,17 @@ class TelegramInventoryBot {
   // Afficher les statistiques
   async showStats(chatId, userId, username) {
     try {
-      const inventory = this.virtualInventory.getUserInventory(userId);
+      // Utiliser Supabase au lieu de l'inventaire virtuel
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      const inventory = await SupabaseInventoryManager.getUserInventory(userId);
       
       // Calculer les statistiques basiques
       const stats = {
         totalGifts: inventory.length,
-        totalValue: inventory.reduce((sum, gift) => sum + (gift.giftValue || 0), 0),
-        uniqueGifts: new Set(inventory.map(gift => gift.giftName)).size,
-        rarestGift: inventory.length > 0 ? inventory[0].giftName : null,
-        mostCommonGift: inventory.length > 0 ? inventory[0].giftName : null
+        totalValue: inventory.reduce((sum, gift) => sum + (gift.gift_value || 0), 0),
+        uniqueGifts: new Set(inventory.map(gift => gift.gift_name)).size,
+        rarestGift: inventory.length > 0 ? inventory[0].gift_name : null,
+        mostCommonGift: inventory.length > 0 ? inventory[0].gift_name : null
       };
       
       let message = `📊 **Statistiques de @${username}**\n\n`;
@@ -314,10 +331,11 @@ class TelegramInventoryBot {
   // Rechercher un gift
   async searchGift(chatId, userId, username, searchTerm) {
     try {
-      const inventory = this.virtualInventory.getUserInventory(userId);
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      const inventory = await SupabaseInventoryManager.getUserInventory(userId);
       const results = inventory.filter(gift => 
-        gift.giftName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        gift.collectibleId.toLowerCase().includes(searchTerm.toLowerCase())
+        gift.gift_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        gift.collectible_id.toLowerCase().includes(searchTerm.toLowerCase())
       );
       
       if (results.length === 0) {
@@ -346,7 +364,8 @@ class TelegramInventoryBot {
   // Afficher les options de withdraw
   async showWithdrawOptions(chatId, userId, username) {
     try {
-      const inventory = await this.inventoryManager.getUserInventory(userId);
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      const inventory = await SupabaseInventoryManager.getUserInventory(userId);
       
       if (inventory.length === 0) {
         await this.sendMessage(chatId, `📦 @${username}, votre inventaire est vide. Aucun gift à retirer.`);
@@ -357,7 +376,7 @@ class TelegramInventoryBot {
       const keyboard = {
         inline_keyboard: inventory.map(gift => [
           {
-            text: `🗑️ ${gift.giftName} (${gift.giftValue}⭐)`,
+            text: `🗑️ ${gift.gift_name} (${gift.gift_value}⭐)`,
             callback_data: `withdraw_${gift.id}`
           }
         ])
@@ -419,16 +438,25 @@ class TelegramInventoryBot {
     try {
       console.log(`🗑️ Demande de withdraw du gift ${giftId} par @${username}`);
       
-      // Retirer le gift de l'inventaire
-      const removedGift = await this.inventoryManager.removeGiftFromInventory(userId, username, giftId);
+      // Utiliser Supabase pour retirer le gift
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
       
-      // TODO: Ici vous devrez implémenter la logique pour envoyer le gift via Telegram
-      // Pour l'instant, on simule juste le retrait de l'inventaire
+      // Récupérer l'inventaire actuel pour obtenir les détails du gift
+      const inventory = await SupabaseInventoryManager.getUserInventory(userId);
+      const giftToRemove = inventory.find(gift => gift.id === giftId);
+      
+      if (!giftToRemove) {
+        await this.sendMessage(chatId, '❌ Gift non trouvé dans votre inventaire');
+        return;
+      }
+      
+      // Retirer le gift de l'inventaire Supabase
+      await SupabaseInventoryManager.removeFromInventory(userId, giftId);
       
       const message = `✅ **Gift retiré avec succès !**\n\n`;
-      message += `🎁 **${removedGift.giftName}**\n`;
-      message += `• Valeur: ${removedGift.giftValue} stars\n`;
-      if (removedGift.collectibleModel) message += `• Modèle: ${removedGift.collectibleModel}\n`;
+      message += `🎁 **${giftToRemove.gift_name}**\n`;
+      message += `• Valeur: ${giftToRemove.gift_value} stars\n`;
+      if (giftToRemove.collectible_model) message += `• Modèle: ${giftToRemove.collectible_model}\n`;
       
       message += `\n💡 Le gift a été retiré de votre inventaire.`;
       
@@ -646,14 +674,19 @@ class TelegramInventoryBot {
     try {
       console.log(`🎁 Gift reçu via détecteur: ${giftData.giftName} de @${giftData.fromUsername}`);
       
-      // Ajouter à l'inventaire
-      await this.inventoryManager.addGiftToInventory(
+      // Utiliser Supabase pour ajouter à l'inventaire
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      
+      await SupabaseInventoryManager.addToInventory(
         giftData.fromUserId,
-        giftData.fromUsername,
-        giftData
+        giftData.giftId || giftData.collectibleId,
+        giftData.giftName,
+        giftData.giftValue,
+        giftData.collectibleModel,
+        giftData.collectibleBackdrop,
+        giftData.collectibleSymbol
       );
       
-      // TODO: Notifier l'utilisateur si possible
       console.log(`✅ Gift ${giftData.giftName} ajouté à l'inventaire de @${giftData.fromUsername}`);
       
     } catch (error) {
@@ -666,17 +699,48 @@ class TelegramInventoryBot {
     try {
       console.log(`🗑️ Withdraw détecté via détecteur: ${giftData.giftName} vers @${giftData.toUsername}`);
       
-      // Retirer de l'inventaire
-      await this.inventoryManager.removeGiftFromInventory(
+      // Utiliser Supabase pour retirer de l'inventaire
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      
+      await SupabaseInventoryManager.removeFromInventory(
         giftData.toUserId,
-        giftData.toUsername,
-        giftData.giftId
+        giftData.giftId || giftData.collectibleId
       );
       
       console.log(`✅ Gift ${giftData.giftName} retiré de l'inventaire de @${giftData.toUsername}`);
       
     } catch (error) {
       console.error('❌ Erreur lors du traitement du withdraw via détecteur:', error);
+    }
+  }
+
+  // Vérifier si une mise à jour a déjà été traitée
+  isUpdateAlreadyProcessed(update) {
+    const updateId = update.update_id;
+    const now = Date.now();
+    
+    // Nettoyer les anciennes entrées (plus de 1 minute)
+    for (const [id, timestamp] of this.lastProcessedTime.entries()) {
+      if (now - timestamp > 60000) {
+        this.lastProcessedTime.delete(id);
+        this.processedUpdates.delete(id);
+      }
+    }
+    
+    return this.processedUpdates.has(updateId);
+  }
+
+  // Marquer une mise à jour comme traitée
+  markUpdateAsProcessed(update) {
+    const updateId = update.update_id;
+    this.processedUpdates.add(updateId);
+    this.lastProcessedTime.set(updateId, Date.now());
+    
+    // Limiter la taille des caches pour éviter la surcharge mémoire
+    if (this.processedUpdates.size > 1000) {
+      const oldestId = this.lastProcessedTime.keys().next().value;
+      this.processedUpdates.delete(oldestId);
+      this.lastProcessedTime.delete(oldestId);
     }
   }
 }

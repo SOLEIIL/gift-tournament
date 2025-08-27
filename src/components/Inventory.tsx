@@ -1,291 +1,135 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from './ui/button';
+import React from 'react';
+import { useInventory } from '../hooks/useInventory';
+import { useTelegram } from '../hooks/useTelegram';
 
-interface Gift {
-  id: string;
-  name: string;
-  value: number;
-  type: string;
-  collectibleId: string;
-  collectibleModel: string;
-  collectibleBackdrop: string;
-  collectibleSymbol: string;
-  receivedAt: string;
-  status: string;
-}
+export const Inventory: React.FC = () => {
+  const { inventory, isLoading, error, refreshInventory } = useInventory();
+  const { user, isTelegram } = useTelegram();
 
-interface UserInventory {
-  userId: string;
-  username: string;
-  totalGifts: number;
-  totalValue: number;
-  gifts: Gift[];
-}
-
-interface InventoryProps {
-  onPageChange: (page: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn') => void;
-  currentPage: 'pvp' | 'rolls' | 'inventory' | 'shop' | 'earn';
-}
-
-export const Inventory: React.FC<InventoryProps> = ({
-  onPageChange,
-  currentPage
-}) => {
-  const [inventory, setInventory] = useState<UserInventory | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
-
-  // Charger l'inventaire réel depuis l'API
-  const loadInventory = async () => {
-    try {
-      setLoading(true);
-      console.log('🔍 Chargement de l\'inventaire réel...');
-      
-      const response = await fetch('/api/real-inventory');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('📊 Données inventaire reçues:', data);
-      
-      if (data.success && data.data.users.length > 0) {
-        // Prendre le premier utilisateur (pour l'instant)
-        setInventory(data.data.users[0]);
-        setLastRefresh(new Date());
-      } else {
-        setInventory(null);
-      }
-      
-    } catch (err) {
-      console.error('❌ Erreur chargement inventaire:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadInventory();
-    
-    // PAS DE REFRESH AUTOMATIQUE - SEULEMENT AU MONTAGE DU COMPOSANT
-    // const interval = setInterval(loadInventory, 3000);
-    // return () => clearInterval(interval);
-  }, []);
-
-  if (loading) {
+  if (!isTelegram) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-ton border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="text-white text-lg">Chargement de l'inventaire...</div>
-          <div className="text-gray-400 text-sm">Connexion au détecteur de gifts</div>
-        </div>
+      <div className="p-4 text-center">
+        <p className="text-gray-600">Cette application doit être ouverte depuis Telegram</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-4 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Chargement de l'inventaire...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl">❌</span>
-          </div>
-          <div className="text-white text-lg mb-2">Erreur de chargement</div>
-          <div className="text-gray-400 text-sm mb-4">{error}</div>
-          <Button
-            onClick={() => window.location.reload()}
-            variant="ton"
-            size="lg"
-          >
-            🔄 Recharger
-          </Button>
+      <div className="p-4 text-center">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <p className="font-bold">Erreur</p>
+          <p>{error}</p>
         </div>
+        <button
+          onClick={refreshInventory}
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Réessayer
+        </button>
       </div>
     );
   }
 
+  if (!inventory) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-gray-600">Aucun inventaire trouvé</p>
+      </div>
+    );
+  }
+
+  // Extraire le nom court et le numéro du gift (ex: LolPop-14559 -> LolPop #14559)
+  const formatGiftName = (collectibleId: string) => {
+    const match = collectibleId.match(/^(.+?)-(\d+)$/);
+    if (match) {
+      const [, shortName, giftNumber] = match;
+      return `${shortName} #${giftNumber}`;
+    }
+    return collectibleId;
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 p-4">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">🎁 Mon Inventaire</h1>
-        {inventory ? (
-          <>
-            <div className="text-lg text-yellow-400 font-semibold">
-              Total Value: {inventory.totalGifts} TON
-            </div>
-            <div className="text-sm text-gray-400">
-              {inventory.totalGifts} gift{inventory.totalGifts !== 1 ? 's' : ''} en collection
-            </div>
-            <div className="text-xs text-blue-400 mt-1">
-              Utilisateur: @{inventory.username} ({inventory.userId})
-            </div>
-          </>
-        ) : (
-          <div className="text-sm text-gray-400">Aucun inventaire trouvé</div>
-        )}
-        
-        {/* Bouton de refresh manuel */}
-        <div className="mt-3">
-          <Button
-            onClick={loadInventory}
-            variant="outline"
-            size="sm"
-            className="text-xs"
-            disabled={loading}
-          >
-            {loading ? '🔄' : '🔄'} Actualiser
-          </Button>
-          <div className="text-xs text-gray-500 mt-1">
-            Dernière mise à jour: {lastRefresh.toLocaleTimeString()}
-          </div>
+    <div className="p-4">
+      {/* En-tête utilisateur */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <h2 className="text-xl font-bold text-blue-800 mb-2">
+          🎁 Inventaire de @{user?.username || 'Utilisateur'}
+        </h2>
+        <p className="text-blue-600">
+          {inventory.count} gift{inventory.count !== 1 ? 's' : ''} en votre possession
+        </p>
+      </div>
+
+      {/* Liste des gifts */}
+      {inventory.inventory.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="text-6xl mb-4">📦</div>
+          <p className="text-gray-600 text-lg">Votre inventaire est vide</p>
+          <p className="text-gray-500 text-sm mt-2">
+            Envoyez des gifts à @WxyzCrypto pour les voir apparaître ici
+          </p>
         </div>
-      </div>
-
-      {/* Inventory Grid */}
-      <div className="mb-6">
-        {inventory && inventory.gifts.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4">
-            {inventory.gifts.map((gift) => (
-              <div
-                key={gift.id}
-                className="bg-card border border-border rounded-lg p-4 text-center hover:border-ton/50 transition-colors"
-              >
-                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-white text-2xl">🎁</span>
-                </div>
-                <div className="text-white font-semibold mb-1">{gift.name}</div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  {gift.collectibleModel} • {gift.collectibleBackdrop}
-                </div>
-                <div className="text-ton font-bold text-lg">{gift.value} TON</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {gift.collectibleSymbol} • {gift.status}
-                </div>
-                <div className="text-xs text-gray-500 mt-2">
-                  {new Date(gift.receivedAt).toLocaleDateString()}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl text-muted-foreground">📦</span>
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Inventaire Vide</h3>
-            <p className="text-muted-foreground mb-4">
-              Vous n'avez pas encore de gifts. Envoyez un gift à @WxyzCrypto pour commencer !
-            </p>
-            <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-4">
-              <div className="text-blue-400 text-sm font-semibold mb-2">📱 Comment recevoir des gifts :</div>
-              <div className="text-blue-300 text-xs space-y-1">
-                <div>1. Ouvrez Telegram</div>
-                <div>2. Contactez @WxyzCrypto</div>
-                <div>3. Envoyez un gift Telegram (25+ stars)</div>
-                <div>4. Il apparaîtra ici automatiquement !</div>
-              </div>
-            </div>
-            <Button
-              onClick={() => onPageChange('pvp')}
-              variant="ton"
-              size="lg"
-              className="w-full max-w-xs"
+      ) : (
+        <div className="space-y-4">
+          {inventory.inventory.map((item) => (
+            <div
+              key={item.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
             >
-              🎮 Commencer à Jouer
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Stats Section */}
-      {inventory && inventory.gifts.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-semibold text-white mb-3">📊 Statistiques de Collection</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-ton">{inventory.totalGifts}</div>
-              <div className="text-sm text-muted-foreground">Total Gifts</div>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    🎁 {formatGiftName(item.gift_id)}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                    <div>
+                      <span className="font-medium">Modèle:</span> {item.collectible_model}
+                    </div>
+                    <div>
+                      <span className="font-medium">Arrière-plan:</span> {item.collectible_backdrop}
+                    </div>
+                    <div>
+                      <span className="font-medium">Symbole:</span> {item.collectible_symbol}
+                    </div>
+                    <div>
+                      <span className="font-medium">Valeur:</span> ⭐ {item.gift_value}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right text-xs text-gray-500">
+                  <div>Reçu le</div>
+                  <div>{new Date(item.received_at).toLocaleDateString('fr-FR')}</div>
+                </div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-400">{inventory.totalValue}</div>
-              <div className="text-sm text-muted-foreground">Valeur Totale (TON)</div>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Bottom Navigation Menu */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 z-50">
-        <div className="flex items-center justify-around max-w-md mx-auto">
-          {/* PvP */}
-          <div 
-            className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onPageChange('pvp')}
-          >
-            <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">⚔️</span>
-            </div>
-            <span className={`text-xs ${currentPage === 'pvp' ? 'text-ton' : 'text-muted-foreground'}`}>
-              PvP
-            </span>
-          </div>
+      {/* Bouton de rafraîchissement */}
+      <div className="mt-6 text-center">
+        <button
+          onClick={refreshInventory}
+          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+        >
+          🔄 Actualiser l'inventaire
+        </button>
+      </div>
 
-          {/* Rolls */}
-          <div 
-            className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onPageChange('rolls')}
-          >
-            <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">🎲</span>
-            </div>
-            <span className={`text-xs ${currentPage === 'rolls' ? 'text-ton' : 'text-muted-foreground'}`}>
-              Rolls
-            </span>
-          </div>
-
-          {/* Inventory */}
-          <div 
-            className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onPageChange('inventory')}
-          >
-            <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">📦</span>
-            </div>
-            <span className={`text-xs ${currentPage === 'inventory' ? 'text-ton' : 'text-muted-foreground'}`}>
-              Inventory
-            </span>
-          </div>
-
-          {/* Shop */}
-          <div 
-            className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onPageChange('shop')}
-          >
-            <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">🛒</span>
-            </div>
-            <span className={`text-xs ${currentPage === 'shop' ? 'text-ton' : 'text-muted-foreground'}`}>
-              Shop
-            </span>
-          </div>
-
-          {/* Earn */}
-          <div 
-            className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onPageChange('earn')}
-          >
-            <div className="w-8 h-8 flex items-center justify-center">
-              <span className="text-xl">💰</span>
-            </div>
-            <span className={`text-xs ${currentPage === 'earn' ? 'text-ton' : 'text-muted-foreground'}`}>
-              Earn
-            </span>
-          </div>
-        </div>
+      {/* Informations de synchronisation */}
+      <div className="mt-6 text-center text-xs text-gray-500">
+        <p>🔄 Synchronisation automatique avec @WxyzCrypto</p>
+        <p>Dernière mise à jour: {inventory.timestamp ? new Date(inventory.timestamp).toLocaleString('fr-FR') : 'N/A'}</p>
       </div>
     </div>
   );

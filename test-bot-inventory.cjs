@@ -1,55 +1,62 @@
 // test-bot-inventory.cjs
-// Test de récupération d'inventaire par le bot
+// Test de l'inventaire vu par le bot
 
 const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
 
 async function testBotInventory() {
   try {
-    console.log('🤖 TEST DU BOT D\'INVENTAIRE');
-    console.log('==============================');
+    console.log('🧪 TEST DE L\'INVENTAIRE DU BOT');
+    console.log('==================================');
     
-    // Simuler la récupération d'inventaire comme le fait le bot
-    const telegramId = '986778065'; // ID de drole
+    const userId = '986778065';
     
-    console.log(`\n📱 Récupération de l'inventaire pour l'utilisateur ${telegramId}...`);
-    
+    // Test 1: Inventaire Supabase
+    console.log('\n📱 Test 1: Inventaire Supabase...');
     try {
-      const inventory = await SupabaseInventoryManager.getUserInventory(telegramId);
+      const supabaseInventory = await SupabaseInventoryManager.getUserInventory(userId);
+      console.log(`✅ Supabase: ${supabaseInventory.length} gifts`);
       
-      if (inventory && inventory.length > 0) {
-        console.log('✅ Inventaire récupéré avec succès !');
-        console.log(`📦 Nombre de gifts: ${inventory.length}`);
-        
-        console.log('\n🎁 Gifts dans l\'inventaire:');
-        inventory.forEach((item, index) => {
-          console.log(`\n   ${index + 1}. ${item.gift_name}`);
-          console.log(`      ID: ${item.gift_id}`);
-          console.log(`      Valeur: ${item.gift_value} stars`);
-          console.log(`      Modèle: ${item.collectible_model}`);
-          console.log(`      Arrière-plan: ${item.collectible_backdrop}`);
-          console.log(`      Symbole: ${item.collectible_symbol}`);
-          console.log(`      Status: ${item.status}`);
-          console.log(`      Reçu le: ${item.received_at}`);
+      if (supabaseInventory.length > 0) {
+        console.log('\n🎁 Gifts dans Supabase:');
+        supabaseInventory.forEach((item, index) => {
+          console.log(`   ${index + 1}. ${item.gift_name} (${item.gift_id})`);
         });
+      }
+    } catch (error) {
+      console.log('❌ Erreur Supabase:', error.message);
+    }
+    
+    // Test 2: Simulation de la commande /inventory
+    console.log('\n🤖 Test 2: Simulation commande /inventory...');
+    try {
+      // Simuler ce que fait le bot
+      const userInventory = await SupabaseInventoryManager.getUserInventory(userId);
+      
+      if (userInventory && userInventory.length > 0) {
+        console.log('✅ Bot devrait voir:', userInventory.length, 'gifts');
         
-        console.log('\n🎯 FORMAT DES DONNÉES:');
-        console.log('✅ gift_name: Présent et correct');
-        console.log('✅ gift_id: Présent et correct');
-        console.log('✅ gift_value: Présent et correct');
-        console.log('✅ collectible_model: Présent et correct');
-        console.log('✅ collectible_backdrop: Présent et correct');
-        console.log('✅ collectible_symbol: Présent et correct');
-        console.log('✅ status: Présent et correct');
-        console.log('✅ received_at: Présent et correct');
+        // Format pour le bot
+        const botFormat = userInventory.map(item => ({
+          id: item.id,
+          gift_name: item.gift_name,
+          gift_id: item.gift_id,
+          gift_value: item.gift_value,
+          collectible_model: item.collectible_model,
+          collectible_backdrop: item.collectible_backdrop,
+          collectible_symbol: item.collectible_symbol,
+          status: item.status,
+          received_at: item.received_at
+        }));
         
-        console.log('\n🎉 LE BOT PEUT MAINTENANT VOIR L\'INVENTAIRE !');
+        console.log('\n📱 Format pour le bot:');
+        console.log(JSON.stringify(botFormat, null, 2));
         
       } else {
-        console.log('❌ Aucun gift trouvé dans l\'inventaire');
+        console.log('⚠️ Bot voit un inventaire vide');
       }
       
     } catch (error) {
-      console.log('❌ Erreur lors de la récupération de l\'inventaire:', error.message);
+      console.log('❌ Erreur simulation bot:', error.message);
     }
     
     console.log('\n🎯 TEST TERMINÉ');
