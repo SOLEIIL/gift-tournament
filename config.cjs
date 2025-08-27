@@ -16,5 +16,8 @@ module.exports = {
   apiKey: 'wxyz-api-key-2024',
   
   // Configuration du compte de dépôt
-  depositAccountUsername: 'WxyzCrypto'
+  depositAccountUsername: 'WxyzCrypto',
+  
+  // Configuration du compte joueur de test (remplacez par votre vrai username)
+  testPlayerUsername: 'drole'
 };
