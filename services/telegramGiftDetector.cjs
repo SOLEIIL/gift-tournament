@@ -184,83 +184,114 @@ class TelegramGiftDetector {
 
   // Démarrer la surveillance par polling
   async startPolling() {
-    console.log('🔍 Démarrage de la surveillance par polling (toutes les 5 secondes)...');
+    console.log('🔍 Démarrage de la surveillance par polling (toutes les 30 secondes)...');
     
     // Première vérification immédiate
     await this.checkForNewMessages();
     
-    // Vérification toutes les 5 secondes
+    // Vérification toutes les 30 secondes (au lieu de 5) pour éviter les flood waits
     this.pollingInterval = setInterval(async () => {
       await this.checkForNewMessages();
-      
-
-    }, 5000);
+    }, 30000); // 30 secondes
     
-    console.log('✅ Polling configuré avec succès');
+    console.log('✅ Polling configuré avec succès (30s)');
   }
 
   // Vérifier les nouveaux messages
   async checkForNewMessages() {
     try {
-      const dialogs = await this.client.getDialogs();
+      // 🔍 VÉRIFICATION OPTIMISÉE : Utiliser le cache des dialogues
+      let dialogs;
       
-      for (const dialog of dialogs) {
-        if (dialog.entity && dialog.entity.className === 'User') {
-          const chatId = dialog.entity.id.toString();
-          const chatName = dialog.entity.username || dialog.entity.firstName || 'Unknown';
+      // Essayer de récupérer les dialogues avec gestion des erreurs
+      try {
+        dialogs = await this.client.getDialogs();
+      } catch (dialogError) {
+        if (dialogError.message.includes('flood wait') || dialogError.message.includes('FLOOD_WAIT')) {
+          console.log('⏳ Flood wait détecté - Attente avant prochaine vérification...');
+          return; // Sortir sans traiter
+        }
+        console.warn('⚠️ Erreur lors de la récupération des dialogues:', dialogError.message);
+        return;
+      }
+      
+      // 🔍 FILTRER UNIQUEMENT LES CHATS UTILES
+      const relevantDialogs = dialogs.filter(dialog => 
+        dialog.entity && 
+        dialog.entity.className === 'User' && 
+        dialog.entity.username === 'WxyzCrypto' // Seulement @WxyzCrypto
+      );
+      
+      if (relevantDialogs.length === 0) {
+        console.log('📱 Aucun dialogue pertinent trouvé pour @WxyzCrypto');
+        return;
+      }
+      
+      console.log(`📱 Vérification des messages pour ${relevantDialogs.length} dialogue(s) pertinent(s)`);
+      
+      for (const dialog of relevantDialogs) {
+        const chatId = dialog.entity.id.toString();
+        const chatName = dialog.entity.username || dialog.entity.firstName || 'Unknown';
+        
+        try {
+          // Obtenir les messages récents avec limite réduite
+          const messages = await this.client.getMessages(dialog.entity, { limit: 5 }); // Limite réduite
           
-          try {
-            // Obtenir les messages récents
-            const messages = await this.client.getMessages(dialog.entity, { limit: 10 });
-            
-            if (messages.length === 0) continue;
-            
-            // Obtenir le dernier ID connu pour ce chat
-            const lastKnownId = this.lastMessageIds.get(chatId) || 0;
-            
-            // Vérifier s'il y a de nouveaux messages
-            for (const message of messages) {
-              if (message.id > lastKnownId) {
-                console.log(`📨 Nouveau message ${message.id} de ${chatName}`);
+          if (messages.length === 0) continue;
+          
+          // Obtenir le dernier ID connu pour ce chat
+          const lastKnownId = this.lastMessageIds.get(chatId) || 0;
+          
+          // Vérifier s'il y a de nouveaux messages
+          for (const message of messages) {
+            if (message.id > lastKnownId) {
+              console.log(`📨 Nouveau message ${message.id} de ${chatName}`);
+              
+              // 🎯 VÉRIFIER SI C'EST UN GIFT TELEGRAM
+              if (this.isRealTelegramGift(message)) {
+                console.log('🎁🎁🎁 NOUVEAU GIFT TELEGRAM DÉTECTÉ ! 🎁🎁🎁');
                 
-                // 🎯 VÉRIFIER SI C'EST UN GIFT TELEGRAM
-                if (this.isRealTelegramGift(message)) {
-                  console.log('🎁🎁🎁 NOUVEAU GIFT TELEGRAM DÉTECTÉ ! 🎁🎁🎁');
-                  
-                  // 🔍 ENRICHIR LE MESSAGE AVEC LES INFOS DU DIALOGUE
-                  const enrichedMessage = {
-                    ...message,
-                    chat: {
-                      id: { value: dialog.entity.id },
-                      username: dialog.entity.username,
-                      title: dialog.entity.firstName || dialog.entity.username
-                    }
-                  };
-                  
-                  if (message.out) {
-                    // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
-                    console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
-                    await this.processWithdrawMessage(enrichedMessage);
-                  } else {
-                    // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
-                    console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
-                    await this.processGiftMessage(enrichedMessage, false);
+                // 🔍 ENRICHIR LE MESSAGE AVEC LES INFOS DU DIALOGUE
+                const enrichedMessage = {
+                  ...message,
+                  chat: {
+                    id: { value: dialog.entity.id },
+                    username: dialog.entity.username,
+                    title: dialog.entity.firstName || dialog.entity.username
                   }
-                }
+                };
                 
-                // Mettre à jour le dernier ID
-                this.lastMessageIds.set(chatId, Math.max(message.id, lastKnownId));
+                if (message.out) {
+                  // 🚫 WITHDRAW : Gift envoyé par @WxyzCrypto
+                  console.log('🚫 WITHDRAW DÉTECTÉ - Gift envoyé par @WxyzCrypto');
+                  await this.processWithdrawMessage(enrichedMessage);
+                } else {
+                  // 🎁 GIFT REÇU : Gift reçu par @WxyzCrypto
+                  console.log('🎁 NOUVEAU GIFT REÇU DÉTECTÉ !');
+                  await this.processGiftMessage(enrichedMessage, false);
+                }
               }
+              
+              // Mettre à jour le dernier ID
+              this.lastMessageIds.set(chatId, Math.max(message.id, lastKnownId));
             }
-            
-          } catch (chatError) {
-            console.warn(`⚠️ Erreur lors de la vérification du chat ${chatName}:`, chatError.message);
-            continue;
           }
+          
+        } catch (chatError) {
+          if (chatError.message.includes('flood wait') || chatError.message.includes('FLOOD_WAIT')) {
+            console.log('⏳ Flood wait lors de la vérification du chat - Attente...');
+            break; // Sortir de la boucle
+          }
+          console.warn(`⚠️ Erreur lors de la vérification du chat ${chatName}:`, chatError.message);
+          continue;
         }
       }
       
     } catch (error) {
+      if (error.message.includes('flood wait') || error.message.includes('FLOOD_WAIT')) {
+        console.log('⏳ Flood wait global détecté - Attente avant prochaine vérification...');
+        return;
+      }
       console.error('❌ Erreur lors de la vérification des nouveaux messages:', error.message);
     }
   }
