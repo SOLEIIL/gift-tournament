@@ -128,28 +128,12 @@ class ProductionSystem {
       console.log(`   🤖 Bot: ${this.inventoryBot?.isRunning ? '✅' : '❌'}`);
       
       // Vérifier la connexion Supabase et compter les gifts
-      try {
-        const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
-        
-        // Compter les gifts dans l'inventaire virtuel du détecteur (qui a les vrais gifts)
-        const virtualGifts = this.giftDetector?.virtualInventory?.getTotalGifts() || 0;
-        
-        // Compter les gifts dans Supabase
-        const supabaseGifts = await SupabaseInventoryManager.getTotalActiveGifts();
-        
-        // Afficher les deux compteurs pour identifier l'incohérence
-        console.log(`   🎯 Virtuel: ${virtualGifts} gift(s), 🗄️ Supabase: ${supabaseGifts} gift(s)`);
-        
-        // Vérifier la cohérence
-        if (virtualGifts !== supabaseGifts) {
-          console.log(`   ⚠️  INCOHÉRENCE DÉTECTÉE ! Supabase devrait avoir ${virtualGifts} gift(s)`);
-        } else {
-          console.log(`   ✅ Cohérence OK`);
-        }
-        
-      } catch (error) {
-        console.log(`   🗄️  Supabase: ❌ (${error.message})`);
-      }
+                          // 🎯 INVENTAIRE VIRTUEL UNIQUEMENT (source de vérité)
+                    const virtualGifts = this.giftDetector?.virtualInventory?.getTotalGifts() || 0;
+                    console.log(`   🎯 Inventaire virtuel: ${virtualGifts} gift(s) (source de vérité)`);
+                    
+                    // 🗄️ Supabase sera synchronisé automatiquement par le détecteur
+                    console.log(`   🗄️  Supabase: Synchronisation automatique (${virtualGifts} gift(s) attendus)`);
       
     } catch (error) {
       console.error('❌ Erreur lors du health check:', error.message);

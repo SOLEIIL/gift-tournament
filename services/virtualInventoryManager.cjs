@@ -189,8 +189,8 @@ class VirtualInventoryManager {
     }
   }
 
-  // 📋 AFFICHER TOUS LES INVENTAIRES
-  displayAllInventories() {
+  // 📋 AFFICHER TOUS LES INVENTAIRES ET SYNCHRONISER AVEC SUPABASE
+  async displayAllInventories() {
     try {
       console.log('\n🎯 INVENTAIRES VIRTUELS ACTUELS:');
       console.log('=====================================');
@@ -200,6 +200,9 @@ class VirtualInventoryManager {
         return;
       }
 
+      // 🔄 SYNCHRONISATION AUTOMATIQUE AVEC SUPABASE
+      console.log('\n🔄 SYNCHRONISATION AVEC SUPABASE...');
+      
       for (const [userId, inventory] of this.virtualInventories) {
         if (inventory.length > 0) {
           const username = inventory[0].fromUsername || 'Unknown';
@@ -208,6 +211,14 @@ class VirtualInventoryManager {
           
           for (const gift of inventory) {
             console.log(`      • ${gift.giftName} (${gift.collectibleId}) - ${gift.timestamp}`);
+          }
+          
+          // 🔄 SYNCHRONISER CET UTILISATEUR AVEC SUPABASE
+          try {
+            await this.syncUserInventoryToSupabase(userId, inventory);
+            console.log(`   ✅ Synchronisation Supabase réussie pour ${username}`);
+          } catch (error) {
+            console.error(`   ❌ Erreur synchronisation Supabase pour ${username}:`, error.message);
           }
         }
       }
@@ -265,6 +276,109 @@ class VirtualInventoryManager {
       
     } catch (error) {
       console.error('❌ Erreur lors de l\'affichage des gifts en attente:', error.message);
+    }
+  }
+
+  // 🔄 SYNCHRONISER UN NOUVEAU GIFT REÇU AVEC SUPABASE
+  async syncNewGiftToSupabase(giftData) {
+    try {
+      // Importer SupabaseInventoryManager
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      
+      const telegramId = giftData.fromUserId;
+      const username = giftData.fromUsername;
+      
+      // Créer ou récupérer l'utilisateur dans Supabase
+      const userRecord = await SupabaseInventoryManager.getOrCreateUser({
+        telegram_id: telegramId,
+        telegram_username: username,
+        telegram_first_name: username,
+        telegram_last_name: ''
+      });
+      
+      // Créer le gift dans Supabase
+      const giftRecord = await SupabaseInventoryManager.getOrCreateGift({
+        collectibleId: giftData.collectibleId,
+        giftName: giftData.giftName,
+        userId: userRecord.telegram_id,
+        username: username
+      });
+      
+      // Ajouter à l'inventaire
+      await SupabaseInventoryManager.addToInventory(
+        userRecord.telegram_id,
+        giftRecord.collectible_id,
+        giftData.telegramMessageId || 0,
+        {
+          collectibleId: giftData.collectibleId,
+          giftName: giftData.giftName,
+          username: username
+        }
+      );
+      
+      console.log(`✅ Nouveau gift ${giftData.giftName} synchronisé avec Supabase !`);
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation du nouveau gift:', error.message);
+      throw error;
+    }
+  }
+
+  // 🔄 SYNCHRONISER L'INVENTAIRE D'UN UTILISATEUR AVEC SUPABASE
+  async syncUserInventoryToSupabase(userId, inventory) {
+    try {
+      // Importer SupabaseInventoryManager
+      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
+      
+      // Récupérer les informations de l'utilisateur
+      const user = inventory[0];
+      const username = user.fromUsername || 'Unknown';
+      const telegramId = userId;
+      
+      // Créer ou récupérer l'utilisateur EXPÉDITEUR dans Supabase
+      const userRecord = await SupabaseInventoryManager.getOrCreateUser({
+        telegram_id: telegramId,
+        telegram_username: username,
+        telegram_first_name: username,
+        telegram_last_name: ''
+      });
+      
+      // Synchroniser chaque gift
+      for (const gift of inventory) {
+        try {
+          // Créer le gift dans Supabase (DB simplifiée)
+          const giftRecord = await SupabaseInventoryManager.getOrCreateGift({
+            collectibleId: gift.collectibleId,
+            giftName: gift.giftName,
+            userId: userRecord.telegram_id, // Télégram ID de l'utilisateur
+            username: username // Username de l'utilisateur
+          });
+          
+          // 🔑 ASSOCIER LE GIFT À L'UTILISATEUR QUI L'A ENVOYÉ
+          await SupabaseInventoryManager.addToInventory(
+            userRecord.telegram_id, // Télégram ID de l'utilisateur
+            giftRecord.collectible_id, // Collectible ID du gift
+            gift.messageId || 0,
+            {
+              collectibleId: gift.collectibleId,
+              giftName: gift.giftName,
+              username: username
+            }
+          );
+          
+          console.log(`      ✅ Gift ${gift.giftName} synchronisé avec Supabase`);
+          
+        } catch (giftError) {
+          console.error(`      ❌ Erreur synchronisation gift ${gift.giftName}:`, giftError.message);
+        }
+      }
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation Supabase:', error.message);
+      throw error;
     }
   }
 
