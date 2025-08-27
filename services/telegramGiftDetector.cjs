@@ -117,25 +117,13 @@ class TelegramGiftDetector {
       
       console.log('🔍 Recherche des VRAIS gifts Telegram dans l\'historique...');
       
-      // 🎯 FILTRER UNIQUEMENT LE COMPTE DE DÉPÔT @WxyzCrypto
-      const depositAccountDialogs = dialogs.filter(dialog => 
-        dialog.entity && 
-        dialog.entity.className === 'User' && 
-        dialog.entity.username === this.depositAccountUsername
-      );
-      
-      if (depositAccountDialogs.length === 0) {
-        console.log(`❌ Aucun dialogue trouvé pour le compte de dépôt @${this.depositAccountUsername}`);
-        console.log('🛑 ARRÊT du scan - compte de dépôt non trouvé');
-        return;
-      }
-      
-      console.log(`✅ Compte de dépôt @${this.depositAccountUsername} trouvé, scan en cours...`);
-      
-      for (const dialog of depositAccountDialogs) {
+      // 🎯 SCANNER TOUS LES CHATS POUR TROUVER LES GIFTS REÇUS PAR @WxyzCrypto
+      for (const dialog of dialogs) {
         if (dialog.entity && dialog.entity.className === 'User') {
           const chatId = dialog.entity.id.toString();
-          console.log(`📱 Vérification du chat avec: ${dialog.entity.username || dialog.entity.firstName || 'Unknown'}`);
+          const chatUsername = dialog.entity.username || dialog.entity.firstName || 'Unknown';
+          
+          console.log(`📱 Vérification du chat avec: ${chatUsername}`);
           
           try {
             const messages = await this.client.getMessages(dialog.entity, { limit: 50 });
@@ -176,7 +164,7 @@ class TelegramGiftDetector {
               }
             }
           } catch (chatError) {
-            console.warn(`⚠️ Erreur lors de la vérification du chat ${dialog.entity.username || 'Unknown'}:`, chatError.message);
+            console.warn(`⚠️ Erreur lors de la vérification du chat ${chatUsername}:`, chatError.message);
             continue;
           }
         }
@@ -230,19 +218,18 @@ class TelegramGiftDetector {
         return;
       }
       
-      // 🔍 FILTRER UNIQUEMENT LES CHATS UTILES
+      // 🔍 VÉRIFIER TOUS LES CHATS POUR LES NOUVEAUX GIFTS
       const relevantDialogs = dialogs.filter(dialog => 
         dialog.entity && 
-        dialog.entity.className === 'User' && 
-        dialog.entity.username === this.depositAccountUsername // Seulement le compte de dépôt configuré
+        dialog.entity.className === 'User'
       );
       
       if (relevantDialogs.length === 0) {
-        console.log('📱 Aucun dialogue pertinent trouvé pour @WxyzCrypto');
+        console.log('📱 Aucun dialogue utilisateur trouvé');
         return;
       }
       
-      console.log(`📱 Vérification des messages pour ${relevantDialogs.length} dialogue(s) pertinent(s)`);
+      console.log(`📱 Vérification des messages pour ${relevantDialogs.length} dialogue(s) utilisateur(s)`);
       
       for (const dialog of relevantDialogs) {
         const chatId = dialog.entity.id.toString();
