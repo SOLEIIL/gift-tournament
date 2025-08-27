@@ -64,7 +64,8 @@ function extractTelegramUserId(userData) {
     // L'ID utilisateur est dans user.id
     if (userData.user) {
       const user = JSON.parse(userData.user);
-      return user.id;
+      // Convertir en string pour la cohérence avec la base de données
+      return user.id.toString();
     }
     return null;
   } catch (error) {
@@ -168,13 +169,13 @@ export default async function handler(req, res) {
     }
 
     // Transformer les données pour la Mini App
-    const transformedInventory = inventory.map(item => ({
-      id: item.id,
+    const transformedInventory = inventory.map((item, index) => ({
+      id: `${item.telegram_id}_${item.collectible_id}`, // ID unique basé sur la clé composite
       collectible_id: item.collectible_id,
       username: item.username,
-      // Formatage selon vos préférences
-      display_name: `${item.collectible_id} #${item.id}`,
-      received_at: item.received_at || new Date().toISOString()
+      // Formatage selon vos préférences (GiftName #1, #2, etc.)
+      display_name: `${item.collectible_id} #${index + 1}`,
+      received_at: new Date().toISOString() // Timestamp actuel
     }));
 
     console.log(`✅ Inventaire sécurisé récupéré: ${transformedInventory.length} gifts pour ${user.username}`);
