@@ -223,6 +223,20 @@ class VirtualInventoryManager {
     }
   }
 
+  // 🔢 COMPTER LE TOTAL DES GIFTS
+  getTotalGifts() {
+    try {
+      let total = 0;
+      for (const [userId, inventory] of this.virtualInventories) {
+        total += inventory.length;
+      }
+      return total;
+    } catch (error) {
+      console.error('❌ Erreur lors du comptage des gifts:', error.message);
+      return 0;
+    }
+  }
+  
   // 🔍 AFFICHER LES GIFTS EN ATTENTE
   displayPendingGifts() {
     try {

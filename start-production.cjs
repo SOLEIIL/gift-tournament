@@ -130,9 +130,23 @@ class ProductionSystem {
       // Vérifier la connexion Supabase et compter les gifts
       try {
         const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
-        // Compter tous les gifts actifs dans la base au lieu d'un utilisateur test
-        const totalGifts = await SupabaseInventoryManager.getTotalActiveGifts();
-        console.log(`   🗄️  Supabase: ✅ (${totalGifts} gifts actifs au total)`);
+        
+        // Compter les gifts dans l'inventaire virtuel
+        const virtualGifts = this.virtualInventory.getTotalGifts();
+        
+        // Compter les gifts dans Supabase
+        const supabaseGifts = await SupabaseInventoryManager.getTotalActiveGifts();
+        
+        // Afficher les deux compteurs pour identifier l'incohérence
+        console.log(`   🎯 Virtuel: ${virtualGifts} gift(s), 🗄️ Supabase: ${supabaseGifts} gift(s)`);
+        
+        // Vérifier la cohérence
+        if (virtualGifts !== supabaseGifts) {
+          console.log(`   ⚠️  INCOHÉRENCE DÉTECTÉE ! Supabase devrait avoir ${virtualGifts} gift(s)`);
+        } else {
+          console.log(`   ✅ Cohérence OK`);
+        }
+        
       } catch (error) {
         console.log(`   🗄️  Supabase: ❌ (${error.message})`);
       }
