@@ -117,8 +117,29 @@ class TelegramGiftDetector {
       
       console.log('🔍 Recherche des VRAIS gifts Telegram dans l\'historique...');
       
-      // 🎯 SCANNER TOUS LES CHATS POUR TROUVER LES GIFTS REÇUS PAR @WxyzCrypto
-      for (const dialog of dialogs) {
+      // 🎯 FILTRER LES CHATS PERTINENTS : Seulement ceux où @WxyzCrypto peut recevoir des gifts
+      const relevantDialogs = dialogs.filter(dialog => {
+        // Exclure le bot lui-même
+        if (dialog.entity.username === 'testnftbuybot') return false;
+        
+        // Exclure les bots en général
+        if (dialog.entity.username && dialog.entity.username.endsWith('bot')) return false;
+        
+        // Inclure seulement les utilisateurs normaux
+        return dialog.entity && 
+               dialog.entity.className === 'User' && 
+               dialog.entity.username !== this.depositAccountUsername; // Exclure @WxyzCrypto lui-même
+      });
+      
+      if (relevantDialogs.length === 0) {
+        console.log('❌ Aucun dialogue utilisateur pertinent trouvé pour recevoir des gifts');
+        console.log('🛑 ARRÊT du scan - pas de chats pertinents');
+        return;
+      }
+      
+      console.log(`✅ ${relevantDialogs.length} dialogue(s) utilisateur(s) pertinent(s) trouvé(s), scan en cours...`);
+      
+      for (const dialog of relevantDialogs) {
         if (dialog.entity && dialog.entity.className === 'User') {
           const chatId = dialog.entity.id.toString();
           const chatUsername = dialog.entity.username || dialog.entity.firstName || 'Unknown';
@@ -218,18 +239,26 @@ class TelegramGiftDetector {
         return;
       }
       
-      // 🔍 VÉRIFIER TOUS LES CHATS POUR LES NOUVEAUX GIFTS
-      const relevantDialogs = dialogs.filter(dialog => 
-        dialog.entity && 
-        dialog.entity.className === 'User'
-      );
+      // 🔍 FILTRER LES CHATS PERTINENTS : Seulement ceux où @WxyzCrypto peut recevoir des gifts
+      const relevantDialogs = dialogs.filter(dialog => {
+        // Exclure le bot lui-même
+        if (dialog.entity.username === 'testnftbuybot') return false;
+        
+        // Exclure les bots en général
+        if (dialog.entity.username && dialog.entity.username.endsWith('bot')) return false;
+        
+        // Inclure seulement les utilisateurs normaux
+        return dialog.entity && 
+               dialog.entity.className === 'User' && 
+               dialog.entity.username !== this.depositAccountUsername; // Exclure @WxyzCrypto lui-même
+      });
       
       if (relevantDialogs.length === 0) {
-        console.log('📱 Aucun dialogue utilisateur trouvé');
+        console.log('📱 Aucun dialogue utilisateur pertinent trouvé pour recevoir des gifts');
         return;
       }
       
-      console.log(`📱 Vérification des messages pour ${relevantDialogs.length} dialogue(s) utilisateur(s)`);
+      console.log(`📱 Vérification des messages pour ${relevantDialogs.length} dialogue(s) utilisateur(s) pertinent(s)`);
       
       for (const dialog of relevantDialogs) {
         const chatId = dialog.entity.id.toString();
