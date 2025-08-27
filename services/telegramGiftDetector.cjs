@@ -292,12 +292,6 @@ class TelegramGiftDetector {
         }
       }
 
-      // 🔍 POUR LE TEST : DÉTECTER AUSSI LES MESSAGES TEXTE NORMALS
-      if (message.message && typeof message.message === 'string' && message.message.trim() !== '') {
-        console.log(`📝 MESSAGE TEXTE DÉTECTÉ POUR TEST: "${message.message}"`);
-        return true; // Détecter les messages texte pour le test
-      }
-
       // 🚫 TOUT LE RESTE EST IGNORÉ
       return false;
       
