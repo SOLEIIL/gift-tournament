@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node start-app.cjs",
+    "start:gifts": "node start-production.cjs",
+    "start:web": "vite",
+    "start:full": "node start-app.cjs",
+    "deploy": "node deploy-vercel.cjs",
+    "deploy:status": "node deploy-vercel.cjs --status"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",
