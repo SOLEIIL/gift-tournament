@@ -4,6 +4,7 @@ const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const crypto = require('crypto');
 const VirtualInventoryManager = require('./virtualInventoryManager.cjs');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 class TelegramGiftDetector {
@@ -29,6 +30,11 @@ class TelegramGiftDetector {
     
     // 🎯 Gestionnaire d'inventaire virtuel
     this.virtualInventory = new VirtualInventoryManager();
+    
+    // 🔗 Configuration Supabase pour la synchronisation
+    this.supabaseUrl = process.env.SUPABASE_URL || 'https://gquyvmelpkgnddvefpwd.supabase.co';
+    this.supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxdXl2bWVscGtnbmRkdmVmcHdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMTU1MDAsImV4cCI6MjA3MTc5MTUwMH0.rzM2n_RyFDlMCxzqLt6B-UHS-OlcoJDXEOWs1-tTN0';
+    this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
     
     // Validation de la configuration
     this.validateConfig();
@@ -400,12 +406,15 @@ class TelegramGiftDetector {
       console.log('📋 Informations du WITHDRAW:', withdrawData);
       
       // 🎯 RETIRER DE L'INVENTAIRE VIRTUEL
-      await this.virtualInventory.removeGiftWithdrawn(withdrawData);
+      this.virtualInventory.removeGiftWithdrawn(withdrawData);
+      
+      // 🔗 SYNCHRONISER AVEC SUPABASE (RETRAIT)
+      await this.syncWithdrawToSupabase(withdrawData);
       
       // Envoyer le webhook pour le withdraw
       await this.sendWebhook('gift_withdrawn', withdrawData);
       
-      console.log('✅ WITHDRAW traité avec succès !');
+      console.log('✅ WITHDRAW traité avec succès et synchronisé avec Supabase !');
       return true;
       
     } catch (error) {
@@ -727,6 +736,88 @@ class TelegramGiftDetector {
     } catch (error) {
       console.error('❌ Erreur lors de l\'extraction du nom d\'utilisateur du destinataire:', error.message);
       return 'unknown';
+    }
+  }
+
+  // 🔗 Synchroniser le retrait avec Supabase
+  async syncWithdrawToSupabase(withdrawData) {
+    try {
+      console.log('🔗 Synchronisation du retrait avec Supabase...');
+      
+      // 🎯 Récupérer l'utilisateur destinataire
+      const { data: user, error: userError } = await this.supabase
+        .from('users')
+        .select('telegram_id, username')
+        .eq('telegram_id', withdrawData.toUserId)
+        .single();
+      
+      if (userError && userError.code !== 'PGRST116') {
+        console.error('❌ Erreur lors de la récupération de l\'utilisateur:', userError);
+        return false;
+      }
+      
+      // 🎯 Si l'utilisateur n'existe pas, le créer
+      let userId = withdrawData.toUserId;
+      let username = withdrawData.toUsername;
+      
+      if (!user) {
+        console.log('👤 Création de l\'utilisateur destinataire...');
+        const { data: newUser, error: createError } = await this.supabase
+          .from('users')
+          .insert({
+            telegram_id: withdrawData.toUserId,
+            username: withdrawData.toUsername
+          })
+          .select('telegram_id, username')
+          .single();
+        
+        if (createError) {
+          console.error('❌ Erreur lors de la création de l\'utilisateur:', createError);
+          return false;
+        }
+        
+        userId = newUser.telegram_id;
+        username = newUser.username;
+        console.log('✅ Utilisateur créé:', username);
+      }
+      
+      // 🎯 Créer l'entrée dans la table gifts
+      const { error: giftError } = await this.supabase
+        .from('gifts')
+        .insert({
+          collectible_id: withdrawData.collectibleId,
+          telegram_id: userId,
+          username: username
+        });
+      
+      if (giftError) {
+        console.error('❌ Erreur lors de la création du gift:', giftError);
+        return false;
+      }
+      
+      // 🎯 Ajouter à l'inventaire de l'utilisateur destinataire
+      const { error: inventoryError } = await this.supabase
+        .from('inventory')
+        .insert({
+          telegram_id: userId,
+          collectible_id: withdrawData.collectibleId,
+          username: username
+        });
+      
+      if (inventoryError) {
+        console.error('❌ Erreur lors de l\'ajout à l\'inventaire:', inventoryError);
+        return false;
+      }
+      
+      console.log('✅ Retrait synchronisé avec Supabase pour l\'utilisateur:', username);
+      console.log('   📦 Gift ajouté:', withdrawData.giftName);
+      console.log('   🆔 Collectible ID:', withdrawData.collectibleId);
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation avec Supabase:', error.message);
+      return false;
     }
   }
 

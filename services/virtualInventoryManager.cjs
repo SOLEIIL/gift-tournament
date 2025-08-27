@@ -72,9 +72,9 @@ class VirtualInventoryManager {
   }
 
   // 🚫 RETIRER UN GIFT (withdraw)
-  async removeGiftWithdrawn(giftData) {
+  removeGiftWithdrawn(giftData) {
     try {
-      const { toUserId, toUsername, giftId, giftName, telegramMessageId, collectibleId } = giftData;
+      const { toUserId, toUsername, giftId, giftName, telegramMessageId } = giftData;
       
       if (!toUserId || toUserId === 'unknown') {
         console.error('❌ Impossible de retirer un gift sans ID utilisateur valide');
@@ -106,17 +106,17 @@ class VirtualInventoryManager {
       // Fallback: chercher par collectibleId et giftName
       if (!pendingGift) {
         for (const [key, gift] of this.pendingGifts) {
-          if (gift.collectibleId === collectibleId && gift.giftName === giftName) {
+          if (gift.collectibleId === giftData.collectibleId && gift.giftName === giftName) {
             pendingGift = gift;
             giftKey = key;
-            console.log(`✅ Gift trouvé par collectibleId: ${collectibleId}`);
+            console.log(`✅ Gift trouvé par collectibleId: ${giftData.collectibleId}`);
             break;
           }
         }
       }
       
       if (!pendingGift) {
-        console.warn(`⚠️ Gift ${giftName} (${collectibleId}) non trouvé dans les gifts en attente`);
+        console.warn(`⚠️ Gift ${giftName} (${giftData.collectibleId}) non trouvé dans les gifts en attente`);
         return false;
       }
 
@@ -125,7 +125,7 @@ class VirtualInventoryManager {
         const userInventory = this.virtualInventories.get(toUserId);
         const giftIndex = userInventory.findIndex(gift => 
           gift.giftId === giftId || 
-          gift.collectibleId === collectibleId ||
+          gift.collectibleId === giftData.collectibleId ||
           gift.messageId === telegramMessageId
         );
         
@@ -147,15 +147,6 @@ class VirtualInventoryManager {
         toUsername,
         giftName
       });
-
-      // 🔄 SYNCHRONISER AVEC SUPABASE
-      try {
-        await this.syncWithdrawToSupabase(giftData);
-        console.log(`✅ Synchronisation Supabase réussie pour le retrait de ${giftName}`);
-      } catch (syncError) {
-        console.error(`❌ Erreur synchronisation Supabase pour le retrait:`, syncError.message);
-        // Ne pas faire échouer le retrait virtuel à cause de l'erreur Supabase
-      }
 
       console.log(`🚫 Gift retiré: ${giftName} de ${toUsername} (${toUserId})`);
       
@@ -387,53 +378,6 @@ class VirtualInventoryManager {
       
     } catch (error) {
       console.error('❌ Erreur lors de la synchronisation Supabase:', error.message);
-      throw error;
-    }
-  }
-
-  // 🚫 SYNCHRONISER UN RETRAIT AVEC SUPABASE
-  async syncWithdrawToSupabase(withdrawData) {
-    try {
-      console.log(`🔄 Synchronisation du retrait avec Supabase...`);
-      
-      const { toUserId, toUsername, collectibleId, giftName, telegramMessageId } = withdrawData;
-      
-      if (!toUserId || toUserId === 'unknown') {
-        throw new Error('ID utilisateur invalide pour la synchronisation Supabase');
-      }
-      
-      const { SupabaseInventoryManager } = require('../lib/supabase.cjs');
-      
-      // Créer ou récupérer l'utilisateur
-      const user = await SupabaseInventoryManager.getOrCreateUser({
-        telegram_id: toUserId,
-        telegram_username: toUsername,
-        telegram_first_name: toUsername || 'Unknown',
-        telegram_last_name: ''
-      });
-      
-      // Retirer le gift de l'inventaire Supabase
-      const result = await SupabaseInventoryManager.removeFromInventory(
-        user.telegram_id, // Utiliser telegram_id au lieu de user.id
-        collectibleId,
-        telegramMessageId,
-        {
-          giftName,
-          collectibleId,
-          username: toUsername
-        }
-      );
-      
-      if (result) {
-        console.log(`✅ Retrait synchronisé avec Supabase: ${giftName} retiré de l'inventaire de @${toUsername}`);
-      } else {
-        console.log(`⚠️ Gift ${giftName} non trouvé dans l'inventaire Supabase de @${toUsername}`);
-      }
-      
-      return result;
-      
-    } catch (error) {
-      console.error('❌ Erreur lors de la synchronisation du retrait avec Supabase:', error.message);
       throw error;
     }
   }
