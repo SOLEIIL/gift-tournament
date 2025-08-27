@@ -127,12 +127,17 @@ class ProductionSystem {
       console.log(`   🎁 Détecteur: ${this.giftDetector?.isRunning ? '✅' : '❌'}`);
       console.log(`   🤖 Bot: ${this.inventoryBot?.isRunning ? '✅' : '❌'}`);
       
-      // Vérifier la connexion Supabase et compter les gifts
+      // Vérifier la connexion Supabase sans tester d'utilisateur spécifique
       try {
         const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
-        const testInventory = await SupabaseInventoryManager.getUserInventory('test');
-        const totalGifts = testInventory.length;
-        console.log(`   🗄️  Supabase: ✅ (${totalGifts} gifts récupérés)`);
+        // Test simple de connexion à la base de données
+        const { data, error } = await SupabaseInventoryManager.supabase
+          .from('gifts')
+          .select('count')
+          .limit(1);
+        
+        if (error) throw error;
+        console.log(`   🗄️  Supabase: ✅ (Connexion OK)`);
       } catch (error) {
         console.log(`   🗄️  Supabase: ❌ (${error.message})`);
       }
@@ -173,12 +178,18 @@ class ProductionSystem {
 
   // Obtenir le statut du système
   async getStatus() {
-    let totalGifts = 0;
+    let dbStatus = '❌';
     
     try {
       const { SupabaseInventoryManager } = require('./lib/supabase.cjs');
-      const testInventory = await SupabaseInventoryManager.getUserInventory('test');
-      totalGifts = testInventory.length;
+      // Test simple de connexion
+      const { data, error } = await SupabaseInventoryManager.supabase
+        .from('gifts')
+        .select('count')
+        .limit(1);
+      
+      if (error) throw error;
+      dbStatus = '✅';
     } catch (error) {
       console.log(`   🗄️  Erreur Supabase dans getStatus: ${error.message}`);
     }
@@ -189,7 +200,7 @@ class ProductionSystem {
       uptime: this.startTime ? Math.floor((new Date() - this.startTime) / 1000) : 0,
       giftDetector: this.giftDetector?.isRunning || false,
       inventoryBot: this.inventoryBot?.isRunning || false,
-      totalGifts: totalGifts
+      dbStatus: dbStatus
     };
   }
 }
