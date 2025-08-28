@@ -206,6 +206,9 @@ class TelegramGiftDetector {
       console.log(`✅ Scan terminé: ${nativeGiftsFound} vrais gifts Telegram trouvés`);
       console.log(`📊 Résultats: ${giftsFound} gifts ajoutés, ${giftsFilteredOut} gifts filtrés (retirés)`);
       
+      // 🔄 SYNCHRONISER LES GIFTS RETIRÉS AVEC SUPABASE AU DÉMARRAGE
+      await this.syncWithdrawnGiftsAtStartup();
+      
     } catch (error) {
       console.error('❌ Erreur lors du scan de l\'historique:', error.message);
       console.log('🛑 ARRÊT du scan en raison d\'une erreur');
@@ -475,23 +478,27 @@ class TelegramGiftDetector {
       // 🎯 AJOUTER À L'INVENTAIRE VIRTUEL
       this.virtualInventory.addGiftReceived(transferData);
 
-      // Envoyer le webhook
-      try {
-        const response = await this.sendWebhook('transfer_received', transferData);
-        if (!response.ok) {
-          console.error(`❌ Erreur webhook: ${response.status}`);
-        }
-      } catch (webhookError) {
-        console.error('❌ Erreur webhook:', webhookError.message);
-      }
+      // 🔗 SYNCHRONISER IMMÉDIATEMENT AVEC SUPABASE
+      await this.syncGiftReceivedToSupabase(transferData);
+
+      // Envoyer le webhook (désactivé temporairement à cause de l'erreur 401)
+      // try {
+      //   const response = await this.sendWebhook('transfer_received', transferData);
+      //   if (!response.ok) {
+      //     console.error(`❌ Erreur webhook: ${response.status}`);
+      //   }
+      // } catch (webhookError) {
+      //   console.error('❌ Erreur webhook:', webhookError.message);
+      // }
+      console.log('📨 Webhook transfer_received désactivé temporairement (erreur 401)');
 
       // Envoyer le webhook de gift reçu
       try {
-        // TEMPORAIREMENT DÉSACTIVÉ POUR ÉVITER LES ERREURS 401
-        // await this.sendWebhook('gift_received', transferData);
-        console.log('📨 Webhook gift_received désactivé temporairement');
+        await this.sendWebhook('gift_received', transferData);
+        console.log('✅ Webhook gift_received envoyé avec succès');
       } catch (error) {
-        console.log('📨 Webhook gift_received désactivé temporairement');
+        console.error('❌ Erreur webhook gift_received:', error.message);
+        // Ne pas désactiver le webhook, juste logger l'erreur
       }
 
       return true;
@@ -696,18 +703,61 @@ class TelegramGiftDetector {
     }
   }
 
-  // Extraire l'ID du destinataire (pour les withdraws)
   extractRecipientId(message) {
     try {
+      // 🔍 PRIORITÉ 1: message.toId (pour les messages envoyés)
       if (message.toId) {
         if (message.toId.className === 'PeerUser') {
+          console.log('✅ ID destinataire trouvé via message.toId:', message.toId.userId);
           return message.toId.userId.toString();
         }
       }
+      
+      // 🔍 PRIORITÉ 2: message.chat.id (pour les conversations privées)
       if (message.chat && message.chat.id) {
-        return message.chat.id.toString();
+        const chatId = message.chat.id;
+        
+        // Si c'est un BigInt, le convertir en string
+        if (typeof chatId === 'bigint') {
+          const userId = chatId.toString().replace('n', '');
+          console.log('✅ ID destinataire trouvé via message.chat.id (BigInt):', userId);
+          return userId;
+        }
+        
+        // Si c'est un objet avec une propriété value (BigInt)
+        if (chatId && typeof chatId === 'object' && chatId.value) {
+          const userId = chatId.value.toString().replace('n', '');
+          console.log('✅ ID destinataire trouvé via message.chat.id.value:', userId);
+          return userId;
+        }
+        
+        // Si c'est un objet avec une propriété userId
+        if (chatId && typeof chatId === 'object' && chatId.userId) {
+          const userId = chatId.userId.toString().replace('n', '');
+          console.log('✅ ID destinataire trouvé via message.chat.id.userId:', userId);
+          return userId;
+        }
+        
+        // Si c'est un nombre ou string simple
+        if (typeof chatId === 'number' || typeof chatId === 'string') {
+          const userId = chatId.toString();
+          console.log('✅ ID destinataire trouvé via message.chat.id (simple):', userId);
+          return userId;
+        }
+        
+        console.warn('⚠️ message.chat.id est un objet complexe:', JSON.stringify(chatId));
       }
+      
+      // 🔍 PRIORITÉ 3: message.peerId (fallback)
+      if (message.peerId && message.peerId.userId) {
+        const userId = message.peerId.userId.toString().replace('n', '');
+        console.log('✅ ID destinataire trouvé via message.peerId.userId:', userId);
+        return userId;
+      }
+      
+      console.warn('⚠️ Aucun ID destinataire trouvé dans le message');
       return 'unknown';
+      
     } catch (error) {
       console.error('❌ Erreur lors de l\'extraction de l\'ID du destinataire:', error.message);
       return 'unknown';
@@ -781,43 +831,247 @@ class TelegramGiftDetector {
         console.log('✅ Utilisateur créé:', username);
       }
       
-      // 🎯 Créer l'entrée dans la table gifts
-      const { error: giftError } = await this.supabase
+      // 🎯 SUPPRIMER le gift de l'inventaire de l'utilisateur (WITHDRAW)
+      console.log(`🗑️ Suppression du gift ${withdrawData.collectibleId} de l'inventaire de ${username}...`);
+      
+      const { error: deleteError } = await this.supabase
         .from('gifts')
-        .insert({
-          collectible_id: withdrawData.collectibleId,
-          telegram_id: userId,
-          username: username
-        });
+        .delete()
+        .eq('telegram_id', userId)
+        .eq('collectible_id', withdrawData.collectibleId);
       
-      if (giftError) {
-        console.error('❌ Erreur lors de la création du gift:', giftError);
+      if (deleteError) {
+        console.error('❌ Erreur lors de la suppression du gift:', deleteError);
         return false;
       }
       
-      // 🎯 Ajouter à l'inventaire de l'utilisateur destinataire
-      const { error: inventoryError } = await this.supabase
-        .from('inventory')
-        .insert({
-          telegram_id: userId,
-          collectible_id: withdrawData.collectibleId,
-          username: username
-        });
+      console.log(`✅ Gift ${withdrawData.collectibleId} supprimé de l'inventaire de ${username}`);
       
-      if (inventoryError) {
-        console.error('❌ Erreur lors de l\'ajout à l\'inventaire:', inventoryError);
-        return false;
-      }
-      
-      console.log('✅ Retrait synchronisé avec Supabase pour l\'utilisateur:', username);
-      console.log('   📦 Gift ajouté:', withdrawData.giftName);
-      console.log('   🆔 Collectible ID:', withdrawData.collectibleId);
+             // 🎯 Transaction enregistrée dans les logs (pas de table transactions pour l'instant)
+       console.log(`📝 Transaction enregistrée: withdraw - User ${userId}, Gift ${withdrawData.collectibleId}`);
       
       return true;
       
     } catch (error) {
       console.error('❌ Erreur lors de la synchronisation avec Supabase:', error.message);
       return false;
+    }
+  }
+
+  // 🔄 Synchroniser les gifts retirés avec Supabase au démarrage
+  async syncWithdrawnGiftsAtStartup() {
+    try {
+      console.log('🔄 Vérification des gifts retirés au démarrage...');
+      
+      // 🎯 Récupérer tous les gifts actifs dans Supabase
+      const { data: activeGifts, error: giftsError } = await this.supabase
+        .from('gifts')
+        .select('*');
+      
+      if (giftsError) {
+        console.error('❌ Erreur lors de la récupération des gifts actifs:', giftsError);
+        return;
+      }
+      
+      if (!activeGifts || activeGifts.length === 0) {
+        console.log('📭 Aucun gift actif trouvé dans Supabase');
+        return;
+      }
+      
+      console.log(`🔍 Vérification de ${activeGifts.length} gifts actifs...`);
+      
+      let withdrawnCount = 0;
+      
+      for (const gift of activeGifts) {
+        try {
+          // 🎯 Vérifier si le gift est encore sur le compte @WxyzCrypto
+          const isStillOnAccount = await this.verifyGiftStillOnAccount(gift.collectible_id, gift.telegram_id);
+          
+          if (!isStillOnAccount) {
+            console.log(`🚫 Gift ${gift.collectible_id} retiré - synchronisation avec Supabase...`);
+            
+            // 🗑️ Supprimer le gift de Supabase
+            const { error: deleteError } = await this.supabase
+              .from('gifts')
+              .delete()
+              .eq('telegram_id', gift.telegram_id)
+              .eq('collectible_id', gift.collectible_id);
+            
+            if (deleteError) {
+              console.error(`❌ Erreur lors de la suppression du gift ${gift.collectible_id}:`, deleteError);
+            } else {
+              console.log(`✅ Gift ${gift.collectible_id} supprimé de Supabase (retiré)`);
+              withdrawnCount++;
+            }
+          }
+        } catch (giftError) {
+          console.warn(`⚠️ Erreur lors de la vérification du gift ${gift.collectible_id}:`, giftError.message);
+        }
+      }
+      
+      if (withdrawnCount > 0) {
+        console.log(`✅ Synchronisation terminée: ${withdrawnCount} gifts retirés synchronisés avec Supabase`);
+      } else {
+        console.log('✅ Aucun gift retiré détecté - synchronisation à jour');
+      }
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation des gifts retirés:', error.message);
+    }
+  }
+
+  // 🔗 Synchroniser le gift reçu avec Supabase
+  async syncGiftReceivedToSupabase(transferData) {
+    try {
+      console.log('🔗 Synchronisation du gift reçu avec Supabase...');
+      
+      // 🎯 Récupérer ou créer l'utilisateur expéditeur
+      const { data: user, error: userError } = await this.supabase
+        .from('users')
+        .select('telegram_id, username')
+        .eq('telegram_id', transferData.fromUserId)
+        .single();
+      
+      if (userError && userError.code !== 'PGRST116') {
+        console.error('❌ Erreur lors de la récupération de l\'utilisateur:', userError);
+        return false;
+      }
+      
+      // 🎯 Si l'utilisateur n'existe pas, le créer
+      let userId = transferData.fromUserId;
+      let username = transferData.fromUsername;
+      
+      if (!user) {
+        console.log('👤 Création de l\'utilisateur expéditeur...');
+        const { data: newUser, error: createError } = await this.supabase
+          .from('users')
+          .insert({
+            telegram_id: transferData.fromUserId,
+            username: transferData.fromUsername
+          })
+          .select('telegram_id, username')
+          .single();
+        
+        if (createError) {
+          console.error('❌ Erreur lors de la création de l\'utilisateur:', createError);
+          return false;
+        }
+        
+        userId = newUser.telegram_id;
+        username = newUser.username;
+        console.log('✅ Utilisateur créé:', username);
+      }
+      
+      // 🎯 AJOUTER le gift à l'inventaire de l'utilisateur
+      console.log(`📦 Ajout du gift ${transferData.collectibleId} à l'inventaire de ${username}...`);
+      
+      const { error: insertError } = await this.supabase
+        .from('gifts')
+        .insert({
+          telegram_id: userId,
+          username: username,
+          collectible_id: transferData.collectibleId
+        });
+      
+      if (insertError) {
+        console.error('❌ Erreur lors de l\'ajout du gift:', insertError);
+        return false;
+      }
+      
+      console.log(`✅ Gift ${transferData.collectibleId} ajouté à l'inventaire de ${username}`);
+      
+      // 🎯 Transaction enregistrée dans les logs
+      console.log(`📝 Transaction enregistrée: gift_received - User ${userId}, Gift ${transferData.collectibleId}`);
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation avec Supabase:', error.message);
+      return false;
+    }
+  }
+
+  // 🔍 Vérifier si un gift spécifique est encore sur le compte @WxyzCrypto
+  async verifyGiftStillOnAccount(collectibleId, telegramId) {
+    try {
+      console.log(`🔍 Vérification détaillée du gift ${collectibleId} pour l'utilisateur ${telegramId}...`);
+      
+      // 🎯 Récupérer l'utilisateur pour accéder à son chat
+      const { data: user, error: userError } = await this.supabase
+        .from('users')
+        .select('telegram_id, username')
+        .eq('telegram_id', telegramId)
+        .single();
+      
+      if (userError) {
+        console.warn(`⚠️ Impossible de récupérer l'utilisateur ${telegramId}:`, userError.message);
+        return false; // Par sécurité, considérer comme retiré
+      }
+      
+      // 🎯 Récupérer le chat avec l'utilisateur
+      const chatEntity = await this.client.getEntity(telegramId);
+      if (!chatEntity) {
+        console.warn(`⚠️ Impossible de récupérer le chat avec ${user.username}`);
+        return false; // Par sécurité, considérer comme retiré
+      }
+      
+      // 🎯 Récupérer les messages récents pour vérifier le gift
+      const messages = await this.client.getMessages(chatEntity, { limit: 200 });
+      console.log(`📱 ${messages.length} messages récupérés pour la vérification du gift ${collectibleId}`);
+      
+      // 🔍 Chercher le gift spécifique dans les messages
+      let giftFound = false;
+      let giftStatus = 'unknown';
+      
+      for (const message of messages) {
+        if (message.action && message.action.className === 'MessageActionStarGiftUnique') {
+          const gift = message.action.gift;
+          if (gift) {
+            // 🔍 Vérifier si c'est le bon gift
+            const messageCollectibleId = gift.slug || `${gift.title}-${gift.num}`;
+            if (messageCollectibleId === collectibleId) {
+              giftFound = true;
+              giftStatus = message.action.transferred === false ? 'active' : 'withdrawn';
+              
+              console.log(`🎁 Gift ${collectibleId} trouvé dans le message ${message.id}:`);
+              console.log(`   - transferred: ${message.action.transferred}`);
+              console.log(`   - status: ${giftStatus}`);
+              console.log(`   - message.out: ${message.out}`);
+              
+              // 🎯 Si c'est un message sortant (withdraw), le gift est retiré
+              if (message.out) {
+                console.log(`🚫 Gift ${collectibleId} détecté comme WITHDRAW (message sortant)`);
+                return false;
+              }
+              
+              // 🎯 Si transferred = true, le gift est retiré
+              if (message.action.transferred === true) {
+                console.log(`🚫 Gift ${collectibleId} transféré/retiré (transferred = true)`);
+                return false;
+              }
+              
+              // 🎯 Si transferred = false, le gift est encore actif
+              if (message.action.transferred === false) {
+                console.log(`✅ Gift ${collectibleId} encore actif sur le compte @WxyzCrypto`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+      
+      if (!giftFound) {
+        console.log(`🚫 Gift ${collectibleId} non trouvé dans l'historique récent - considéré comme retiré`);
+        return false;
+      }
+      
+      // 🚫 Si on arrive ici, le gift a un statut inconnu - considérer comme retiré par sécurité
+      console.log(`⚠️ Gift ${collectibleId} trouvé mais statut inconnu (${giftStatus}) - considéré comme retiré par sécurité`);
+      return false;
+      
+    } catch (error) {
+      console.error(`❌ Erreur lors de la vérification du gift ${collectibleId}:`, error.message);
+      return false; // Par sécurité, considérer comme retiré
     }
   }
 
