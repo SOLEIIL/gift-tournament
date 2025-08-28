@@ -147,16 +147,10 @@ export default async function handler(req, res) {
     console.log(`✅ Utilisateur trouvé: @${user.username} (${user.telegram_id})`);
 
     // Récupérer l'inventaire PRIVÉ de l'utilisateur authentifié
-    const { data: inventory, error: inventoryError } = await supabase
-      .from('inventory')
-      .select(`
-        *,
-        gifts (
-          collectible_id,
-          telegram_id,
-          username
-        )
-      `)
+    // Utilise directement la table gifts comme inventaire (après nettoyage)
+    const { data: gifts, error: inventoryError } = await supabase
+      .from('gifts')
+      .select('*')
       .eq('telegram_id', telegramUserId); // SÉCURITÉ : uniquement l'inventaire de l'utilisateur connecté
 
     if (inventoryError) {
@@ -169,12 +163,12 @@ export default async function handler(req, res) {
     }
 
     // Transformer les données pour la Mini App
-    const transformedInventory = inventory.map((item, index) => ({
-      id: `${item.telegram_id}_${item.collectible_id}`, // ID unique basé sur la clé composite
-      collectible_id: item.collectible_id,
-      username: item.username,
+    const transformedInventory = gifts.map((gift, index) => ({
+      id: `${gift.telegram_id}_${gift.collectible_id}`, // ID unique basé sur la clé composite
+      collectible_id: gift.collectible_id,
+      username: gift.username,
       // Formatage selon vos préférences (GiftName #1, #2, etc.)
-      display_name: `${item.collectible_id} #${index + 1}`,
+      display_name: `${gift.collectible_id} #${index + 1}`,
       received_at: new Date().toISOString() // Timestamp actuel
     }));
 
